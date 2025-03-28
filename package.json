@@ -1,0 +1,31 @@
+{
+  "name": "devil-you-nosql",
+  "version": "1.0.0",
+  "description": "Ghost Rider inspired preview of Aurora DSQL",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node build/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pchinjr/devil-you-nosql.git"
+  },
+  "homepage": "https://github.com/pchinjr/devil-you-nosql#readme",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.257.0",
+    "@aws-sdk/credential-providers": "^3.777.0",
+    "@aws-sdk/lib-dynamodb": "^3.257.0",
+    "@aws-sdk/util-format-url": "^3.775.0",
+    "pg": "^8.9.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.148",
+    "@types/node": "^18.15.0",
+    "@types/pg": "^8.6.6",
+    "esbuild": "^0.25.1",
+    "typescript": "^4.9.5"
+  }
+}

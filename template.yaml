@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Combined deployment for Ghost Rider's Soul Tracker application.
+  This stack deploys:
+    - A DynamoDB-based Soul Tracker Lambda (using a single-table design) at the /dynamo/souls route.
+    - An Aurora DSQL-based Soul Tracker Lambda at the /dsql/souls route.
+
+Parameters:
+  TableName:
+    Type: String
+    Default: DevilSoulTracker
+    Description: The name of the DynamoDB table for managing soul contracts, events, and ledger entries.
+  DSQLEndpoint:
+    Type: String
+    Default: "biabt6nyamlxp6zhjydgrlpd7a.dsql.us-east-1.on.aws"
+    Description: Aurora DSQL Endpoint
+
+Resources:
+  # Single-Table DynamoDB for the DynamoDB Soul Tracker
+  SoulsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+
+  # DynamoDB-based Soul Tracker Lambda (Single-Table Design)
+  DynamoSoulTrackerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: dynamoSoulTracker.handler
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Events:
+        DynamoApiEvent:
+          Type: Api
+          Properties:
+            Path: dynamo/souls
+            Method: ANY
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Scan
+                - dynamodb:TransactWriteItems
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - dynamoSoulTracker.ts
+
+  # Aurora DSQL-based Soul Tracker Lambda
+  DsqlSoulTrackerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: dsqlSoulTracker.handler
+      Runtime: nodejs18.x
+      Timeout: 10
+      Environment:
+        Variables:
+          DSQL_ENDPOINT: !Ref DSQLEndpoint
+      Events:
+        AuroraApiEvent:
+          Type: Api
+          Properties:
+            Path: dsql/souls
+            Method: ANY
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dsql:DbConnectAdmin
+              Resource: "*"  # You should restrict this to your cluster ARN.
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - dsqlSoulTracker.ts
+
+  AuroraTablesResource:
+    Type: Custom::CreateAuroraTables
+    Properties:
+      ServiceToken: !GetAtt CreateAuroraTablesFunction.Arn
+
+  CreateAuroraTablesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: createAuroraTables.handler
+      Runtime: nodejs18.x
+      Timeout: 30
+      Environment:
+        Variables:
+          DSQL_ENDPOINT: !Ref DSQLEndpoint
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dsql:DbConnectAdmin
+              Resource: "*" # You should restrict this to your cluster ARN.
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - createAuroraTables.ts  
+Outputs:
+  DynamoApiUrl:
+    Description: "API Gateway endpoint URL for the DynamoDB Soul Tracker"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/dynamo/souls"
+  AuroraApiUrl:
+    Description: "API Gateway endpoint URL for the Aurora DSQL Soul Tracker"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/dsql/souls"
