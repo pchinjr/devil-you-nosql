@@ -97,34 +97,6 @@ Resources:
       BuildProperties:
         EntryPoints:
           - dsqlSoulTracker.ts
-
-  AuroraTablesResource:
-    Type: Custom::CreateAuroraTables
-    Properties:
-      ServiceToken: !GetAtt CreateAuroraTablesFunction.Arn
-
-  CreateAuroraTablesFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/
-      Handler: createAuroraTables.handler
-      Runtime: nodejs18.x
-      Timeout: 30
-      Environment:
-        Variables:
-          DSQL_ENDPOINT: !Ref DSQLEndpoint
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Statement:
-            - Effect: Allow
-              Action:
-                - dsql:DbConnectAdmin
-              Resource: "*" # You should restrict this to your cluster ARN.
-    Metadata:
-      BuildMethod: esbuild
-      BuildProperties:
-        EntryPoints:
-          - createAuroraTables.ts  
 Outputs:
   DynamoApiUrl:
     Description: "API Gateway endpoint URL for the DynamoDB Soul Tracker"

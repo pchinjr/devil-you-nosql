@@ -16,9 +16,10 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.257.0",
     "@aws-sdk/credential-providers": "^3.777.0",
+    "@aws-sdk/dsql-signer": "^3.782.0",
     "@aws-sdk/lib-dynamodb": "^3.257.0",
     "@aws-sdk/util-format-url": "^3.775.0",
-    "pg": "^8.9.0",
+    "pg": "^8.14.1",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
