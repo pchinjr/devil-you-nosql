@@ -1,179 +1,208 @@
-# The Devil You NoSQL
+## The Devil You NoSQL
 
-A proof-of-concept repository demonstrating two approaches for managing "soul contracts" in a Ghost Rider–themed application:
-- A DynamoDB-based Soul Tracker using a single-table design.
-- An Aurora DSQL-based Soul Tracker using IAM authentication and standard SQL transactions.
+A proof-of-concept demonstrating two approaches for managing “soul contracts” in a Ghost Rider–themed application:
 
-This repository also includes two utility scripts for Aurora DSQL:
-- **verifyDsql.js:** Verifies connectivity by inserting and reading test data.
-- **createSoulTrackerTables.js:** Creates the necessary tables for the Soul Tracker in Aurora DSQL.
+* **DynamoDB-based Soul Tracker** using a single-table design.
+* **Aurora DSQL-based Soul Tracker** using IAM authentication and native SQL transactions.
+
+This repo also includes scripts for schema bootstrapping, connectivity verification, data seeding, indexing, performance measurement, and analytics.
+---
 
 ## Repository Structure
 
 ```
 devil-you-nosql/
 ├── src/
-│   ├── dsqlSoulTracker.ts              # Aurora DSQL-based Soul Tracker Lambda 
-│   ├── dynamoSoulTracker.ts            # DynamoDB-based Soul Tracker Lambda 
+│   ├── dynamoSoulTracker.ts            # DynamoDB-based Soul Tracker Lambda
+│   └── dsqlSoulTracker.ts              # Aurora DSQL-based Soul Tracker Lambda
 ├── scripts/
-│   ├── verifyDsql.js                   # Script to verify Aurora DSQL connectivity (read/write test)
-│   └── createSoulTrackerTables.js      # Script to create necessary Aurora DSQL tables for the Soul Tracker
-├── template.yaml                       # Combined SAM template to deploy both Lambdas in a single stack
-├── package.json                        # Package configuration for Node.js dependencies and build scripts
+│   ├── verifyDsql.js                   # Test DSQL connectivity (create/read/drop)
+│   ├── createSoulTrackerTables.js      # Create soul-contract tables in Aurora DSQL
+│   ├── seedDynamoSmall.js              # Seed DynamoDB (10 souls × 100 events + 100 ledger)
+│   ├── seedDsqlSmall.js                # Seed Aurora DSQL (10 souls × 100 events + 100 ledger)
+│   ├── createDsqlIndexes.js            # Create ASYNC indexes on DSQL tables
+│   ├── measureDynamo.js                # Measure pure DynamoDB lookup latency
+│   ├── measureDsql.js                  # Measure pure Aurora DSQL lookup latency
+│   ├── analyticsDynamo.js              # Client-side analytics (daily totals + window) on DynamoDB
+│   └── analyticsDsql.js                # Single-SQL analytics (CTE + window functions) on Aurora DSQL
+├── template.yaml                       # SAM template for both Lambdas + DynamoDB table
+├── package.json                        # Node.js dependencies & scripts
 ├── tsconfig.json                       # TypeScript configuration
-└── README.md                           # You are here!
+└── README.md                           # This file
 ```
+
+---
 
 ## Prerequisites
 
-- **Node.js**: Version 20.x or above is recommended.
-- **AWS SAM CLI**: Installed and configured ([Installation Guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)).
-- **AWS Credentials**: Properly configured (e.g., using AWS CLI profiles, environment variables, or IAM roles).
-- **Aurora DSQL Cluster**: For the Aurora-based Lambda, ensure you have an Aurora DSQL cluster created and note the cluster endpoint.
-- **Environment Variables**:
-  - `DSQL_ENDPOINT`: The Aurora DSQL cluster endpoint (e.g., `cluster-abc123.dsql.us-east-1.on.aws`).
-  - `AWS_REGION`: The AWS region (defaults to `us-east-1` if not specified).
-  - For the DynamoDB Lambda, the table name will be provided via the SAM template parameter (`TableName`).
+* **Node.js** v20+
+* **AWS SAM CLI** ([Install Guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html))
+* **AWS Credentials** (via CLI profile, ENV vars, or attached IAM role)
+* **Aurora DSQL Cluster** (provisioned & note the endpoint)
+* **Environment Variables** for local scripts:
 
-## Deploying with SAM
+  * `DSQL_ENDPOINT` – your Aurora DSQL cluster endpoint
+  * `AWS_REGION` – AWS region (defaults to `us-east-1`)
 
-This repository uses a single SAM template to deploy both the DynamoDB-based and Aurora DSQL-based Soul Tracker Lambdas.
+---
 
-### Steps:
+## 1. Provision Aurora DSQL Cluster (Console)
 
-1. **Build the SAM Application:**
+1. **Open the Aurora DSQL Console**
+   Sign in to the AWS Console and navigate to **Amazon Aurora DSQL**: [https://console.aws.amazon.com/dsql](https://console.aws.amazon.com/dsql) ([AWS Documentation][1])
+2. **Create a Cluster**
+   Click **Create cluster**, enter a name (and optional tags/deletion protection), then click **Create cluster**.
+3. **Wait for ACTIVE status**
+   On the **Clusters** page, wait until **Status** reads **ACTIVE** ([AWS Documentation][2]).
+4. **Copy the Endpoint**
+   Select your cluster and under **Connectivity**, copy the **Endpoint (Host)** (e.g., `abc123.dsql.us-east-1.on.aws`) ([AWS Documentation][1]).
 
-   From the repository root, run:
+---
+
+## 2. Bootstrap Schema in CloudShell
+
+Amazon CloudShell comes pre-installed with `psql` v14+, making it easy to run DDL without installing clients.
+
+1. **Launch CloudShell**
+   Click the **>\_ CloudShell** icon in the AWS Console header .
+2. **Clone & Install**
+
+   ```bash
+   git clone https://github.com/your-org/devil-you-nosql.git
+   cd devil-you-nosql
+   npm install
+   ```
+3. **Create Tables**
+
+   ```bash
+   export DSQL_ENDPOINT=<your-cluster-endpoint>
+   node scripts/createSoulTrackerTables.js
+   ```
+
+   This script issues `CREATE TABLE IF NOT EXISTS` for `soul_contracts`, `soul_contract_events`, and `soul_ledger`.
+
+---
+
+## 3. Deploy with AWS SAM
+
+With your database ready, deploy both Lambdas and the DynamoDB table in one stack.
+
+1. **Build**
+
    ```bash
    sam build --template-file template.yaml
    ```
+2. **Deploy**
 
-2. **Deploy the Stack:**
-
-   Use the guided deploy command:
    ```bash
-   sam deploy --guided --template-file .aws-sam/build/template.yaml --stack-name DevilYouNoSQLStack
+   sam deploy --guided --stack-name DevilYouNoSQLStack
    ```
-   
-   During deployment, you'll be prompted for parameters:
-   
-   - **TableName:** (For the DynamoDB table; default is `DevilSoulTracker`)
-   - **DSQLEndpoint:** Endpoint for the DSQL Cluster.
 
-3. **Verify Deployment:**
+   * **TableName**: DynamoDB table name (default `DevilSoulTracker`)
+   * **DSQLEndpoint**: Aurora DSQL endpoint (paste your value)
+3. **Post-Deploy**
+   SAM outputs two API URLs:
 
-   Once deployed, the SAM template outputs two API URLs:
-   - **DynamoApiUrl:** for the DynamoDB-based Soul Tracker (accessible at `/dynamo/souls`)
-   - **AuroraApiUrl:** for the Aurora DSQL-based Soul Tracker (accessible at `/dsql/souls`)
+   * `<DynamoApiUrl>/dynamo/souls`
+   * `<AuroraApiUrl>/dsql/souls`
 
-   Use curl, Postman, or your browser to test these endpoints.
+---
 
-## Lambdas
+## 4. Testing Your APIs
 
-### DynamoDB-based Soul Tracker (src/singleTableSoulTracker.ts)
-- **Purpose:**  
-  Implements a single-table design in DynamoDB that manages soul contracts, events, and ledger entries.
-- **Key Features:**
-  - Receives API calls at `/dynamo/souls`
-  - Executes a multi-item transaction to update a soul contract, log an event, and record a ledger entry.
-  - Uses DynamoDB’s `TransactWriteItems` for atomic updates.
-- **Deployment:**  
-  Deployed via the SAM template parameter `TableName`.
+Example `curl` commands (replace `<API_URL>` with SAM outputs):
 
-### Aurora DSQL-based Soul Tracker (src/instrumentedAuroraSoulTracker.ts)
-- **Purpose:**  
-  Implements the same soul contract management but using Aurora DSQL. It uses IAM authentication (via `DsqlSigner`) and a multi-statement SQL transaction for business operations.
-- **Key Features:**
-  - Receives API calls at `/dsql/souls`
-  - Generates an IAM token and connects using the PostgreSQL `pg` client.
-  - Uses standard SQL for atomic operations to update a contract, insert an event, and record a ledger entry.
-  - Includes performance instrumentation for connection and transaction times.
-- **Deployment:**  
-  Uses the `DSQL_CONNECTION_STRING` parameter, or alternatively, extracts the endpoint from the event payload.
+```bash
+curl -X POST <DynamoApiUrl>/dynamo/souls \
+  -H "Content-Type: application/json" \
+  -d '{"soulId":"soul-001","newStatus":"Released","amount":100}'
 
-## Scripts
+curl -X POST <AuroraApiUrl>/dsql/souls \
+  -H "Content-Type: application/json" \
+  -d '{
+    "soulContractId":"soul-123",
+    "newStatus":"Released",
+    "amount":150,
+    "endpoint":"abc123.dsql.us-east-1.on.aws"
+}'
+```
 
-### verifyDsql.js
-- **Purpose:**  
-  A standalone Node.js script to verify Aurora DSQL connectivity. It:
-  - Generates an IAM token.
-  - Connects to Aurora DSQL.
-  - Creates a test table, inserts and selects a test record.
-  - Drops the test table.
-- **Usage:**  
-  Set the environment variables `DSQL_ENDPOINT` (and `AWS_REGION`), then run:
+---
+
+## 5. Utility Scripts
+
+### Schema & Connectivity
+
+* **verifyDsql.js**
+  Verifies DSQL by creating/reading/dropping a test table.
+
   ```bash
-  node verifyDsql.js
+  DSQL_ENDPOINT=… AWS_REGION=… node scripts/verifyDsql.js
   ```
 
-### createSoulTrackerTables.js
-- **Purpose:**  
-  A Node.js script to create (or drop and re-create) the required tables (`soul_contracts`, `soul_contract_events`, `soul_ledger`) in Aurora DSQL. This provides a simple way to bootstrap the schema independent of a CloudFormation custom resource.
-- **Usage:**
-  Set the environment variables and run:
+* **createSoulTrackerTables.js**
+  Creates the three soul-tracker tables in Aurora DSQL.
+
   ```bash
-  node createSoulTrackerTables.js
+  DSQL_ENDPOINT=… node scripts/createSoulTrackerTables.js
   ```
 
-## Template YAML
+### Data Seeding
 
-The **template.yaml** file in the repository defines:
-- A DynamoDB table for the DynamoDB-based Lambda.
-- Two Lambda functions (one for DynamoDB and one for Aurora DSQL).
-- API Gateway events for exposing the functions via different routes (`/dynamo/souls` and `/dsql/souls`).
-- Necessary IAM policies for each function.
+* **seedDynamoSmall.js**
+  Seeds DynamoDB (10 souls × 100 events + 100 ledger).
+* **seedDsqlSmall.js**
+  Seeds Aurora DSQL similarly.
 
-## Cleaning Up
+  ```bash
+  npm install @aws-sdk/client-dynamodb @aws-sdk/dsql-signer pg
+  DSQL_ENDPOINT=… node scripts/seedDynamoSmall.js
+  DSQL_ENDPOINT=… node scripts/seedDsqlSmall.js
+  ```
 
-To delete your deployed stack when you're done testing:
+### Index Management
+
+* **createDsqlIndexes.js**
+  Idempotently creates `CREATE INDEX ASYNC IF NOT EXISTS` on the DSQL tables.
+
+  ```bash
+  DSQL_ENDPOINT=… node scripts/createDsqlIndexes.js
+  ```
+
+### Performance Measurement
+
+* **measureDynamo.js**
+  Measures pure DynamoDB lookup latency.
+* **measureDsql.js**
+  Measures pure Aurora DSQL lookup latency.
+
+  ```bash
+  npm install @aws-sdk/client-dynamodb @aws-sdk/dsql-signer pg
+  DSQL_ENDPOINT=… node scripts/measureDynamo.js
+  DSQL_ENDPOINT=… node scripts/measureDsql.js
+  ```
+
+### Analytics Comparison
+
+* **analyticsDynamo.js**
+  Runs daily totals + running total + day-rank client-side on DynamoDB.
+* **analyticsDsql.js**
+  Runs the same analytics in one SQL (Common Table Expression (CTE) + window functions) on Aurora DSQL.
+
+  ```bash
+  npm install @aws-sdk/client-dynamodb @aws-sdk/dsql-signer pg
+  DSQL_ENDPOINT=… node scripts/analyticsDynamo.js
+  DSQL_ENDPOINT=… node scripts/analyticsDsql.js
+  ```
+
+---
+
+## 6. Cleaning Up
+
 ```bash
 sam delete --stack-name DevilYouNoSQLStack --region <your-region>
 ```
 
-## Summary
-
-This repository, **devil-you-nosql**, demonstrates two approaches to manage complex transactional workflows (managing soul contracts) for a Ghost Rider–themed application using AWS:
-- A DynamoDB-based Lambda with a single-table design.
-- An Aurora DSQL-based Lambda using IAM authentication and native SQL transactions.
-
-Both Lambdas are deployed via a single SAM template, and there are supporting Node.js scripts for verifying connectivity and bootstrapping your Aurora DSQL schema.
-
-Enjoy experimenting, and remember: When it comes to managing souls, sometimes you need to confront the devil you know—and the devil you don't!
-
 ---
 
-Feel free to modify and extend the README as your project evolves.
-# devil-you-nosql
-Ghost Rider inspired preview of Aurora DSQL
-
-## Set up
-- install dev container dependencies
-    - aws cli
-    - sam cli 
-    - typescript 
-- log into aws console and set temporary credentials in env vars
-    ```
-    export AWS_SECRET_ACCESS_KEY="xxxxxxx"
-    export AWS_SESSION_TOKEN="xxxxxx"
-    export AWS_DEFAULT_REGION="us-east-1"
-    ```
-- `npm i -g esbuild` needs global install of esbuild for sam template to build ts to js 
-## Deploy with SAM and AWS CLI
-```
-sam build
-sam deploy --guided
-```
-
-### Replace <API_URL> with the output from the deployment
-curl -X POST https://12s0cyrgck.execute-api.us-east-1.amazonaws.com/Prod/dynamo/souls \
-  -H "Content-Type: application/json" \
-  -d '{"soulId": "soul-001", "newStatus": "Released", "amount": 100}'
-
-curl -X POST https://12s0cyrgck.execute-api.us-east-1.amazonaws.com/Prod/dsql/souls \
-  -H "Content-Type: application/json" \
-  -d '{
-    "soulContractId": "soul-123",
-    "newStatus": "Released",
-    "amount": 150,
-    "endpoint": "biabt6nyamlxp6zhjydgrlpd7a.dsql.us-east-1.on.aws"
-}'  
+This repository illustrates both the **devil you know** (NoSQL agility) and the **devil you don’t** (relational power) in action—so you can choose the best tool for managing soul contracts in your next spectral saga.
