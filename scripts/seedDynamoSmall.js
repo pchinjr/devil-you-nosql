@@ -21,11 +21,12 @@ function chunk(arr, n) {
 
 async function seed() {
   const allRequests = [];
+  const baseTime = new Date('2024-01-01T00:00:00Z');
 
   for (let i = 1; i <= 10; i++) {
     const id = `soul-${String(i).padStart(3, "0")}`;
     const pk = `SOUL#${id}`;
-    const now = new Date().toISOString();
+    const now = new Date(baseTime.getTime() + i * 1000).toISOString();
 
     // 1) Master contract item
     allRequests.push({
@@ -41,7 +42,7 @@ async function seed() {
 
     // 2) 100 events
     for (let j = 0; j < 100; j++) {
-      const eventTime = new Date(Date.now() + i * 1000 + j * 60000).toISOString();
+      const eventTime = new Date(baseTime.getTime() + i * 1000 + j * 60000).toISOString();
       allRequests.push({
         PutRequest: {
           Item: {
@@ -56,8 +57,8 @@ async function seed() {
 
     // 3) 100 ledger entries
     for (let j = 0; j < 100; j++) {
-      const txTime = new Date(Date.now() + i * 2000 + j * 90000).toISOString();
-      const amount = (Math.random() * 100).toFixed(2);
+      const txTime = new Date(baseTime.getTime() + i * 2000 + j * 90000).toISOString();
+      const amount = ((i * 100 + j) % 100).toFixed(2);
       allRequests.push({
         PutRequest: {
           Item: {

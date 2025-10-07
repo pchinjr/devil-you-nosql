@@ -72,35 +72,40 @@ async function main() {
 
     // 4) Seed 10 souls
     console.log("🌱 Seeding 10 souls…");
+    const baseTime = new Date('2024-01-01T00:00:00Z');
+    
     for (let i = 1; i <= 10; i++) {
       const id = `soul-${String(i).padStart(3, "0")}`;
+      const contractTime = new Date(baseTime.getTime() + i * 1000);
 
       // Upsert master contract
       await client.query(
         `INSERT INTO soul_contracts(id, contract_status, updated_at)
-           VALUES($1, $2, NOW())
+           VALUES($1, $2, $3)
          ON CONFLICT(id) DO UPDATE
            SET contract_status = EXCLUDED.contract_status,
                updated_at      = EXCLUDED.updated_at;`,
-        [id, "Under Contract"]
+        [id, "Under Contract", contractTime]
       );
 
       // Insert 100 events
       for (let j = 0; j < 100; j++) {
+        const eventTime = new Date(baseTime.getTime() + i * 1000 + j * 60000);
         await client.query(
           `INSERT INTO soul_contract_events(soul_contract_id, event_time, description)
-             VALUES($1, NOW() + ($2 * INTERVAL '1 minute'), $3);`,
-          [id, i * 100 + j, `Event #${j + 1} for ${id}`]
+             VALUES($1, $2, $3);`,
+          [id, eventTime, `Event #${j + 1} for ${id}`]
         );
       }
 
       // Insert 100 ledger entries
       for (let j = 0; j < 100; j++) {
-        const amount = (Math.random() * 100).toFixed(2);
+        const amount = ((i * 100 + j) % 100).toFixed(2);
+        const txTime = new Date(baseTime.getTime() + i * 2000 + j * 90000);
         await client.query(
           `INSERT INTO soul_ledger(soul_contract_id, amount, transaction_time, description)
-             VALUES($1, $2, NOW() + ($3 * INTERVAL '1 minute'), $4);`,
-          [id, amount, i * 200 + j, `Charge #${j + 1} for ${id}`]
+             VALUES($1, $2, $3, $4);`,
+          [id, amount, txTime, `Charge #${j + 1} for ${id}`]
         );
       }
 
