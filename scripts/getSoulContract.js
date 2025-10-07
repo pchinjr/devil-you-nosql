@@ -4,7 +4,7 @@
  * Demo reader for Ghost Rider’s devilish soul contracts.
  * Hard-coded parameters:
  *   soulContractId = "soul-123"
- *   endpoint       = "biabt6nyamlxp6zhjydgrlpd7a.dsql.us-east-1.on.aws"
+ *   endpoint       = "xxxxxxxxxxxxxx.dsql.us-east-1.on.aws"
  *   region         = "us-east-1"
  */
 

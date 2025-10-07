@@ -5,7 +5,7 @@
  *
  * Usage:
  *   npm install @aws-sdk/dsql-signer pg
- *   export DSQL_ENDPOINT=biabt6nyamlxp6zhjydgrlpd7a.dsql.us-east-1.on.aws
+ *   export DSQL_ENDPOINT=xxxxxxxxxxxxxxxxxx.dsql.us-east-1.on.aws
  *   node scripts/createDsqlIndexes.js
  */
 

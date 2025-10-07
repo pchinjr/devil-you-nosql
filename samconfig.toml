@@ -1,10 +1,10 @@
 version = 0.1
 [default.deploy.parameters]
-stack_name = "devil-nosql2"
+stack_name = "devil-nosql"
 resolve_s3 = true
-s3_prefix = "devil-nosql2"
+s3_prefix = "devil-nosql"
 region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "TableName=\"DevilSoulTracker\" DSQLEndpoint=\"biabt6nyamlxp6zhjydgrlpd7a.dsql.us-east-1.on.aws\""
+parameter_overrides = "TableName=\"DevilSoulTracker\""
 image_repositories = []
