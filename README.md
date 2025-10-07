@@ -206,3 +206,58 @@ sam delete --stack-name DevilYouNoSQLStack --region <your-region>
 ---
 
 This repository illustrates both the **devil you know** (NoSQL agility) and the **devil you don’t** (relational power) in action—so you can choose the best tool for managing soul contracts in your next spectral saga.
+
+## 7. Demo Findings & Trade-offs
+
+### Foundational Concepts Demonstrated
+
+This demo illustrates core AWS guidance on SQL vs NoSQL trade-offs through practical examples:
+
+**Data Models in Action:**
+- **DynamoDB**: Single-table design with composite keys (`PK=SOUL#soul-001`, `SK=LEDGER#uuid`) 
+- **Aurora DSQL**: Normalized tables with foreign key relationships (`soul_contracts` → `soul_ledger`)
+
+**Performance Characteristics:**
+- **DynamoDB**: Compute-optimized, network latency dependent (sub-10ms partition key queries)
+- **Aurora DSQL**: Storage-optimized, benefits from query optimization and indexing
+
+**Scaling Patterns:**
+- **DynamoDB**: Horizontal scaling through partitioning (seamless auto-scaling)
+- **Aurora DSQL**: Serverless SQL processing with connection pooling
+
+### Key Strengths Demonstrated
+
+**DynamoDB Advantages:**
+* **Predictable performance**: Sub-10ms key-based lookups at any scale
+* **Simple transactions**: ACID guarantees within partition boundaries
+* **Zero administration**: Fully managed with auto-scaling
+* **Compute-optimized**: Performance driven by hardware/network, not disk I/O
+
+**Aurora DSQL Advantages:**
+* **Complex analytics**: Single SQL handles aggregations, window functions, CTEs
+* **Relational queries**: Natural JOINs and complex WHERE clauses
+* **Full ACID transactions**: BEGIN/COMMIT/ROLLBACK across multiple tables
+* **Rich tooling**: Standard SQL with extensive query optimization capabilities
+
+### Performance Patterns Observed
+
+* **Point lookups**: DynamoDB excels with partition key queries
+* **Analytical workloads**: DSQL processes complex aggregations server-side vs client-side JavaScript
+* **Transaction overhead**: DSQL connection setup adds latency but enables richer operations
+* **Scaling characteristics**: DynamoDB seamless auto-scaling vs DSQL's serverless SQL processing
+
+### When to Choose Each
+
+**Choose DynamoDB when:**
+- Web-scale applications (social networks, gaming, IoT)
+- Access patterns are key-based and predictable
+- You need guaranteed single-digit millisecond latency
+- Schema flexibility for JSON/semistructured data
+- Operational simplicity is paramount
+
+**Choose Aurora DSQL when:**
+- Ad hoc queries and data warehousing needs
+- Analytics and reporting are primary use cases
+- Complex queries with JOINs are common
+- Well-defined relational schema exists
+- SQL expertise and tooling are important
