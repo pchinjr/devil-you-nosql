@@ -14,8 +14,8 @@ const { DsqlSigner } = require("@aws-sdk/dsql-signer");
 const { Client }      = require("pg");
 
 async function main() {
-  const endpoint = "biabt6nyamlxp6zhjydgrlpd7a.dsql.us-east-1.on.aws";
-  const region   = "us-east-1";
+  const endpoint = process.env.DSQL_ENDPOINT;
+  const region   = process.env.AWS_REGION || "us-east-1";
 
   console.log(`🔧 Connecting to Aurora DSQL at ${endpoint}…`);
 
