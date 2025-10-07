@@ -10,8 +10,7 @@ const { Client }     = require("pg");
 const { performance } = require("perf_hooks");
 
 async function analyticsDsql() {
-  const endpoint = process.env.DSQL_ENDPOINT ||
-    "biabt6nyamlxp6zhjydgrlpd7a.dsql.us-east-1.on.aws";
+  const endpoint = process.env.DSQL_ENDPOINT;
   const region = process.env.AWS_REGION || "us-east-1";
 
   // 1) Generate IAM authentication token
