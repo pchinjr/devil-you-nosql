@@ -11,12 +11,16 @@ Parameters:
     Type: String
     Default: DevilSoulTracker
     Description: The name of the DynamoDB table for managing soul contracts, events, and ledger entries.
-  DSQLEndpoint:
-    Type: String
-    Default: "biabt6nyamlxp6zhjydgrlpd7a.dsql.us-east-1.on.aws"
-    Description: Aurora DSQL Endpoint
 
 Resources:
+  # Aurora DSQL Cluster
+  DSQLCluster:
+    Type: AWS::DSQL::Cluster
+    Properties:
+      DeletionProtectionEnabled: false
+      Tags:
+        - Key: Project
+          Value: DevilYouNoSQL
   # Single-Table DynamoDB for the DynamoDB Soul Tracker
   SoulsTable:
     Type: AWS::DynamoDB::Table
@@ -78,7 +82,7 @@ Resources:
       Timeout: 10
       Environment:
         Variables:
-          DSQL_ENDPOINT: !Ref DSQLEndpoint
+          DSQL_ENDPOINT: !GetAtt DSQLCluster.Endpoint
       Events:
         AuroraApiEvent:
           Type: Api
@@ -99,6 +103,9 @@ Resources:
           - dsqlSoulTracker.ts
 
 Outputs:
+  DSQLEndpoint:
+    Description: "Aurora DSQL cluster endpoint"
+    Value: !GetAtt DSQLCluster.Endpoint
   DynamoApiUrl:
     Description: "API Gateway endpoint URL for the DynamoDB Soul Tracker"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/dynamo/souls"
