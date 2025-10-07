@@ -82,7 +82,7 @@ Resources:
       Timeout: 10
       Environment:
         Variables:
-          DSQL_ENDPOINT: !GetAtt DSQLCluster.ClusterEndpoint
+          DSQL_ENDPOINT: !Sub "${DSQLCluster}.dsql.${AWS::Region}.on.aws"
       Events:
         AuroraApiEvent:
           Type: Api
@@ -105,7 +105,7 @@ Resources:
 Outputs:
   DSQLEndpoint:
     Description: "Aurora DSQL cluster endpoint"
-    Value: !GetAtt DSQLCluster.ClusterEndpoint
+    Value: !Sub "${DSQLCluster}.dsql.${AWS::Region}.on.aws"
   DynamoApiUrl:
     Description: "API Gateway endpoint URL for the DynamoDB Soul Tracker"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/dynamo/souls"
