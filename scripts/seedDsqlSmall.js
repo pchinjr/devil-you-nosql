@@ -42,25 +42,32 @@ async function main() {
   try {
     // 3) Create tables & async indexes (no FK constraints)
     console.log("📐 Ensuring tables and ASYNC indexes exist…");
+    
     await client.query(`
       CREATE TABLE IF NOT EXISTS soul_contracts (
         id              TEXT PRIMARY KEY,
         contract_status TEXT NOT NULL,
         updated_at      TIMESTAMP NOT NULL
-      );
+      )
+    `);
+    
+    await client.query(`
       CREATE TABLE IF NOT EXISTS soul_contract_events (
         id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         soul_contract_id TEXT NOT NULL,
         event_time       TIMESTAMP NOT NULL,
         description      TEXT NOT NULL
-      );
+      )
+    `);
+    
+    await client.query(`
       CREATE TABLE IF NOT EXISTS soul_ledger (
         id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         soul_contract_id TEXT NOT NULL,
         amount           NUMERIC NOT NULL,
         transaction_time TIMESTAMP NOT NULL,
         description      TEXT NOT NULL
-      );
+      )
     `);
 
     // 4) Seed 10 souls
