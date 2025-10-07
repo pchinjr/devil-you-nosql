@@ -20,11 +20,17 @@ devil-you-nosql/
 │   ├── createSoulTrackerTables.js      # Create soul-contract tables in Aurora DSQL
 │   ├── seedDynamoSmall.js              # Seed DynamoDB (10 souls × 100 events + 100 ledger)
 │   ├── seedDsqlSmall.js                # Seed Aurora DSQL (10 souls × 100 events + 100 ledger)
+│   ├── seedLarge.js                    # Seed large datasets (configurable size)
 │   ├── createDsqlIndexes.js            # Create ASYNC indexes on DSQL tables
 │   ├── measureDynamo.js                # Measure pure DynamoDB lookup latency
 │   ├── measureDsql.js                  # Measure pure Aurora DSQL lookup latency
+│   ├── benchmark.js                    # Comprehensive performance benchmarking
+│   ├── validate.js                     # Data consistency validation
+│   ├── loadTest.js                     # Concurrent load testing
+│   ├── runTests.js                     # Test suite orchestrator
 │   ├── analyticsDynamo.js              # Client-side analytics (daily totals + window) on DynamoDB
 │   └── analyticsDsql.js                # Single-SQL analytics (CTE + window functions) on Aurora DSQL
+├── run-rigorous-demo.sh                # Comprehensive demo runner
 ├── template.yaml                       # SAM template for both Lambdas + DynamoDB table
 ├── package.json                        # Node.js dependencies & scripts
 ├── tsconfig.json                       # TypeScript configuration
@@ -261,3 +267,86 @@ This demo illustrates core AWS guidance on SQL vs NoSQL trade-offs through pract
 - Complex queries with JOINs are common
 - Well-defined relational schema exists
 - SQL expertise and tooling are important
+
+---
+
+## 8. Rigorous Testing & Benchmarking
+
+This demo includes comprehensive testing suites to rigorously evaluate both DynamoDB and Aurora DSQL performance characteristics.
+
+### Quick Start - Rigorous Demo
+
+```bash
+# Set your DSQL endpoint
+export DSQL_ENDPOINT=your-cluster-endpoint.dsql.us-east-1.on.aws
+
+# Run the complete rigorous demo
+./run-rigorous-demo.sh
+
+# Or run specific test suites
+npm run test:validate    # Data consistency validation
+npm run test:benchmark   # Performance benchmarking  
+npm run test:load       # Load testing
+npm run seed:large      # Large dataset seeding
+```
+
+### Test Suites
+
+**Data Validation (`scripts/validate.js`)**
+- Verifies data consistency between DynamoDB and DSQL
+- Validates index creation and performance
+- Ensures both systems return equivalent results
+
+**Performance Benchmarking (`scripts/benchmark.js`)**
+- Measures latency percentiles (P50, P95, P99) for both systems
+- Tests point lookups, range queries, and complex analytics
+- Provides statistical analysis of performance characteristics
+
+**Load Testing (`scripts/loadTest.js`)**
+- Concurrent read/write testing with configurable load
+- Throughput measurement under sustained load
+- Error rate monitoring and performance degradation analysis
+
+**Large Dataset Seeding (`scripts/seedLarge.js`)**
+- Configurable dataset sizes (1K-10K+ souls)
+- Realistic data distribution and relationships
+- Batch processing for efficient data loading
+
+### Demo Modes
+
+```bash
+# Quick validation and benchmarks (2-3 minutes)
+./run-rigorous-demo.sh quick
+
+# Full comprehensive testing (5-10 minutes)  
+./run-rigorous-demo.sh full
+
+# Large dataset testing (10-20 minutes)
+./run-rigorous-demo.sh full large
+
+# Load testing only
+./run-rigorous-demo.sh load
+
+# Benchmark comparison only
+./run-rigorous-demo.sh benchmark
+```
+
+### Expected Results
+
+The rigorous testing demonstrates:
+
+**DynamoDB Strengths:**
+- Sub-10ms point lookups at any scale
+- Predictable performance regardless of dataset size
+- Linear scaling with partition distribution
+- Consistent throughput under load
+
+**Aurora DSQL Strengths:**  
+- Complex analytics in single SQL queries
+- Rich query optimization and indexing
+- Full ACID transactions across tables
+- Superior for ad-hoc analytical workloads
+
+---
+
+This repository illustrates both the **devil you know** (NoSQL agility) and the **devil you don't** (relational power) in action—so you can choose the best tool for managing soul contracts in your next spectral saga.
