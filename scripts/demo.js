@@ -80,7 +80,13 @@ class MainDemo {
 
   async demoPhilosophy() {
     console.log('🎭 DESIGN PHILOSOPHY DEMONSTRATION');
-    console.log('==================================\n');
+    console.log('==================================');
+    console.log('📖 All operations are READ-ONLY queries demonstrating:');
+    console.log('   • User profile retrieval (mobile app scenario)');
+    console.log('   • Business analytics (executive dashboard)');
+    console.log('   • Batch operations (admin panel loading)');
+    console.log('   • Complex analytics (risk analysis)');
+    console.log('🎯 Focus: Query performance, not write throughput\n');
 
     const soulId = await this.getSampleSoulId();
 
@@ -127,6 +133,10 @@ class MainDemo {
       if (i === 0) {
         this.dynamoItemCount = dynamoResult.Items.length;
         this.dsqlRowCount = dsqlResult.rows.length;
+        
+        // Log sample data that frontend would receive
+        this.dynamoSampleData = dynamoResult.Items;
+        this.dsqlSampleData = dsqlResult.rows;
       }
     }
 
@@ -158,6 +168,18 @@ class MainDemo {
       console.log(`   🚨 DSQL cold start detected: ${dsqlStats.max.toFixed(1)}ms (${(dsqlStats.max/dynamoStats.mean).toFixed(1)}x slower)`);
       console.log('   💡 This demonstrates "devil you don\'t know" - unpredictable performance');
     }
+    
+    // Show sample data that frontend would receive
+    console.log('\n📋 SAMPLE DATA RETURNED TO FRONTEND:');
+    console.log('🔥 DynamoDB Items (raw single-table format):');
+    this.dynamoSampleData.slice(0, 2).forEach((item, i) => {
+      console.log(`   Item ${i + 1}: ${item.SK} - ${item.soulId || 'N/A'} (${item.description || item.contract_status || item.amount || 'contract'})`);
+    });
+    
+    console.log('⚡ DSQL Result (aggregated with JOINs):');
+    this.dsqlSampleData.forEach((row, i) => {
+      console.log(`   Soul ${i + 1}: ${row.id} - Status: ${row.contract_status}, Events: ${row.events?.length || 0}, Power: ${row.total_power || 0}`);
+    });
     console.log('');
 
     // Scenario 2: Analytics Query - Show both implementations
@@ -266,6 +288,18 @@ class MainDemo {
     console.log('   ⚠️ Complexity: N+M queries (N locations + M souls) + application logic');
     console.log(`   💸 Cost: ${totalDynamoQueries} read operations vs 1 DSQL query`);
     console.log(`   📈 Performance ratio: ${(dynamoAnalyticsTime/analyticsTime).toFixed(1)}x slower than DSQL`);
+    
+    // Show analytics results that frontend would receive
+    console.log('\n📊 ANALYTICS RESULTS FOR FRONTEND:');
+    console.log('⚡ DSQL Business Intelligence (ready for dashboard):');
+    analyticsResult.rows.slice(0, 3).forEach((row, i) => {
+      console.log(`   Location ${i + 1}: ${row.contract_location} - ${row.soul_count} souls, ${row.redeemed} redeemed (${row.redemption_rate}%), Power: ${row.total_power}`);
+    });
+    
+    console.log('🔥 DynamoDB Equivalent (requires client processing):');
+    sortedLocations.slice(0, 3).forEach(([location, data], i) => {
+      console.log(`   Location ${i + 1}: ${location} - ${data.soul_count} souls, ${data.redeemed} redeemed (${data.redemption_rate.toFixed(1)}%), Power: ${data.total_power}`);
+    });
     console.log('');
   }
 
@@ -290,6 +324,9 @@ class MainDemo {
       }
     }));
     const batchTime = Date.now() - batchStart;
+    
+    // Store batch result for frontend data display
+    this.batchResult = batchResult;
 
     console.log(`   ✅ DynamoDB BatchGetItem: ${batchTime}ms for ${keys.length} contracts`);
     console.log(`   🔧 How: Single API call retrieves all items simultaneously`);
@@ -353,6 +390,14 @@ class MainDemo {
     console.log('   💡 Key insight: SQL IN clause is the proper way to batch in SQL databases');
     console.log('   🔧 Use case: DynamoDB wins for purpose-built APIs, SQL wins with proper syntax');
     console.log('   📊 Scalability: Both approaches scale well with proper implementation');
+    
+    // Show batch results that frontend would receive
+    console.log('\n🔥 BATCH OPERATION RESULTS FOR FRONTEND:');
+    console.log('📦 Sample contracts retrieved:');
+    const sampleContracts = this.batchResult.Responses[TABLE_NAME].slice(0, 3);
+    sampleContracts.forEach((contract, i) => {
+      console.log(`   Contract ${i + 1}: ${contract.soulId} - ${contract.status} at ${contract.contract_location}`);
+    });
     console.log('');
 
     // DSQL Strength: Complex Queries with statistical analysis
@@ -416,6 +461,15 @@ class MainDemo {
     console.log('   📈 Business value: Risk analysis, profitability ranking, activity metrics');
     console.log('   🚫 DynamoDB equivalent: Impossible without extensive client-side processing');
     console.log('   ⚠️ Alternative: Would require scanning entire table + complex application logic');
+    
+    // Show complex analytics results
+    console.log('\n📈 COMPLEX ANALYTICS RESULTS FOR FRONTEND:');
+    console.log('🎯 Risk Analysis Dashboard Data:');
+    if (complexResult && complexResult.rows) {
+      complexResult.rows.slice(0, 3).forEach((row, i) => {
+        console.log(`   Location ${i + 1}: ${row.contract_location} - Rank: ${row.profitability_rank}, Activity: ${row.activity_rate}%, Net Power: ${row.avg_net_power}`);
+      });
+    }
     console.log('');
 
     console.log('🎯 PERFORMANCE ANALYSIS');
