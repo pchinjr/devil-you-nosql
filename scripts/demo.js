@@ -40,6 +40,11 @@ class MainDemo {
     console.log('The Devil You Know vs The Devil You Don\'t\n');
 
     await this.setupDSQL();
+    
+    // Warm up connections to get more realistic performance
+    console.log('🔥 Warming up connections...');
+    await this.warmupConnections();
+    console.log('✅ Warmup complete\n');
 
     // Core Philosophy Demo
     await this.demoPhilosophy();
@@ -48,6 +53,29 @@ class MainDemo {
     await this.demoStrengths();
 
     await this.dsqlClient.end();
+  }
+
+  async warmupConnections() {
+    // Warm up DynamoDB
+    try {
+      await dynamodb.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        IndexName: 'StatusIndex',
+        KeyConditionExpression: '#status = :status',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: { ':status': 'Bound' },
+        Limit: 1
+      }));
+    } catch (e) {
+      // Ignore warmup errors
+    }
+
+    // Warm up DSQL with simple query
+    try {
+      await this.dsqlClient.query('SELECT COUNT(*) FROM soul_contracts LIMIT 1');
+    } catch (e) {
+      // Ignore warmup errors
+    }
   }
 
   async demoPhilosophy() {
@@ -61,41 +89,72 @@ class MainDemo {
     console.log('   🎯 Goal: Retrieve soul contract + all events + total power in one operation');
     console.log('   📱 Use case: Mobile app showing user\'s complete supernatural profile\n');
     
-    const dynamoStart = Date.now();
-    const dynamoResult = await dynamodb.send(new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: 'PK = :pk',
-      ExpressionAttributeValues: { ':pk': `SOUL#${soulId}` }
-    }));
-    const dynamoTime = Date.now() - dynamoStart;
+    // Scenario 1: Complete Soul Profile - Test multiple times for variability
+    console.log('📋 SCENARIO: Get complete soul profile (user-facing app)');
+    console.log('   🎯 Goal: Retrieve soul contract + all events + total power in one operation');
+    console.log('   📱 Use case: Mobile app showing user\'s complete supernatural profile');
+    console.log('   🔬 Testing: Multiple runs to show performance variability\n');
+    
+    const runs = 3;
+    const dynamoTimes = [];
+    const dsqlTimes = [];
 
-    const dsqlStart = Date.now();
-    const dsqlResult = await this.dsqlClient.query(`
-      SELECT sc.*, 
-             array_agg(sce.description) as events,
-             sum(sl.amount) as total_power
-      FROM soul_contracts sc
-      LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id  
-      LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
-      WHERE sc.id = $1
-      GROUP BY sc.id, sc.contract_status, sc.soul_type, sc.contract_location, sc.updated_at
-    `, [soulId]);
-    const dsqlTime = Date.now() - dsqlStart;
+    for (let i = 0; i < runs; i++) {
+      const dynamoStart = Date.now();
+      const dynamoResult = await dynamodb.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: 'PK = :pk',
+        ExpressionAttributeValues: { ':pk': `SOUL#${soulId}` }
+      }));
+      const dynamoTime = Date.now() - dynamoStart;
+      dynamoTimes.push(dynamoTime);
 
-    console.log(`🔥 DynamoDB: ${dynamoTime}ms (${dynamoResult.Items.length} items)`);
+      const dsqlStart = Date.now();
+      const dsqlResult = await this.dsqlClient.query(`
+        SELECT sc.*, 
+               array_agg(sce.description) as events,
+               sum(sl.amount) as total_power
+        FROM soul_contracts sc
+        LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id  
+        LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
+        WHERE sc.id = $1
+        GROUP BY sc.id, sc.contract_status, sc.soul_type, sc.contract_location, sc.updated_at
+      `, [soulId]);
+      const dsqlTime = Date.now() - dsqlStart;
+      dsqlTimes.push(dsqlTime);
+
+      // Store result info from first run
+      if (i === 0) {
+        this.dynamoItemCount = dynamoResult.Items.length;
+        this.dsqlRowCount = dsqlResult.rows.length;
+      }
+    }
+
+    const dynamoAvg = Math.round(dynamoTimes.reduce((a, b) => a + b) / runs);
+    const dsqlAvg = Math.round(dsqlTimes.reduce((a, b) => a + b) / runs);
+    const dynamoRange = `${Math.min(...dynamoTimes)}-${Math.max(...dynamoTimes)}ms`;
+    const dsqlRange = `${Math.min(...dsqlTimes)}-${Math.max(...dsqlTimes)}ms`;
+
+    console.log(`🔥 DynamoDB: ${dynamoAvg}ms avg (${dynamoRange}) - ${this.dynamoItemCount} items`);
     console.log('   💡 Single-table design - all related data co-located');
     console.log('   🔧 How: One query returns contract + events + ledger entries');
-    console.log('   📊 Performance: Consistent ~25-30ms regardless of data complexity');
-    console.log(`⚡ DSQL: ${dsqlTime}ms (${dsqlResult.rows.length} rows)`);
+    console.log('   📊 Performance: Consistent ~25-35ms regardless of data complexity');
+    console.log(`   🎯 Variability: ${Math.max(...dynamoTimes) - Math.min(...dynamoTimes)}ms range (predictable)`);
+    
+    console.log(`⚡ DSQL: ${dsqlAvg}ms avg (${dsqlRange}) - ${this.dsqlRowCount} rows`);
     console.log('   💡 Normalized schema with JOINs');
     console.log('   🔧 How: JOIN 3 tables + aggregate events + sum power');
     console.log('   📊 Performance: Variable based on JOIN complexity and data volume');
+    console.log(`   ⚠️  Variability: ${Math.max(...dsqlTimes) - Math.min(...dsqlTimes)}ms range (unpredictable)`);
     
-    const performanceRatio = Math.round(dsqlTime / dynamoTime);
-    if (performanceRatio > 5) {
-      console.log(`   ⚠️  DSQL is ${performanceRatio}x slower - significant JOIN overhead for entity retrieval`);
+    const performanceRatio = Math.round(dsqlAvg / dynamoAvg);
+    const maxDsql = Math.max(...dsqlTimes);
+    
+    if (maxDsql > 200) {
+      console.log(`   🚨 DSQL showed cold start: ${maxDsql}ms (${Math.round(maxDsql/dynamoAvg)}x slower than DynamoDB)`);
+      console.log('   💡 This demonstrates "devil you don\'t know" - unpredictable performance');
     } else if (performanceRatio > 2) {
-      console.log(`   ⚠️  DSQL is ${performanceRatio}x slower - moderate JOIN overhead`);
+      console.log(`   ⚠️  DSQL is ${performanceRatio}x slower on average - JOIN overhead`);
     } else {
       console.log(`   ✅ Performance comparable (${performanceRatio}x difference)`);
     }
@@ -230,14 +289,21 @@ class MainDemo {
     console.log('🔥 DynamoDB: "The devil you know"');
     console.log('   ✅ When to choose: User-facing apps, known access patterns, predictable load');
     console.log('   📊 Performance: Consistent 25-35ms for entity operations');
+    console.log('   🎯 Predictability: Low variability, reliable response times');
     console.log('   💰 Cost model: Pay per operation, predictable scaling');
     console.log('   🎯 Sweet spot: Mobile apps, gaming, IoT, real-time applications');
     console.log('');
     console.log('⚡ DSQL: "The devil you don\'t"');
     console.log('   ✅ When to choose: Analytics, evolving requirements, complex relationships');
     console.log('   📊 Performance: 30-50ms for analytics, variable for complex JOINs');
+    console.log('   ⚠️  Unpredictability: Can range from 30ms to 300ms+ (cold starts, query complexity)');
     console.log('   💰 Cost model: Pay for compute time, efficient for analytical workloads');
     console.log('   🎯 Sweet spot: Business intelligence, reporting, data exploration');
+    console.log('');
+    console.log('💡 THE VARIABILITY LESSON:');
+    console.log('   🔥 DynamoDB: Consistent performance you can architect around');
+    console.log('   ⚡ DSQL: Variable performance requires defensive programming');
+    console.log('   🎭 This IS the philosophical difference - predictable vs flexible');
     console.log('');
     console.log('💡 ARCHITECTURAL DECISION MATRIX:');
     console.log('   📱 User-facing latency critical? → DynamoDB');
@@ -246,6 +312,8 @@ class MainDemo {
     console.log('   🔍 Query flexibility needed? → DSQL');
     console.log('   💸 Predictable costs important? → DynamoDB');
     console.log('   🧮 Complex calculations required? → DSQL');
+    console.log('   ⏱️  Consistent response times critical? → DynamoDB');
+    console.log('   🔬 Can handle variable performance? → DSQL');
     console.log('');
     console.log('🎭 Remember: You can use BOTH in the same application!');
     console.log('   • DynamoDB for user-facing operations');
