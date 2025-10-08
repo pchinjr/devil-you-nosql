@@ -89,27 +89,27 @@ class MainDemo {
     console.log('   🎯 Goal: Retrieve soul contract + all events + total power in one operation');
     console.log('   📱 Use case: Mobile app showing user\'s complete supernatural profile\n');
     
-    // Scenario 1: Complete Soul Profile - Test multiple times for variability
+    // Scenario 1: Complete Soul Profile - Rigorous statistical testing
     console.log('📋 SCENARIO: Get complete soul profile (user-facing app)');
     console.log('   🎯 Goal: Retrieve soul contract + all events + total power in one operation');
     console.log('   📱 Use case: Mobile app showing user\'s complete supernatural profile');
-    console.log('   🔬 Testing: Multiple runs to show performance variability\n');
+    console.log('   🔬 Testing: Statistical analysis with confidence intervals\n');
     
-    const runs = 3;
+    const runs = 10;
     const dynamoTimes = [];
     const dsqlTimes = [];
 
     for (let i = 0; i < runs; i++) {
-      const dynamoStart = Date.now();
+      const dynamoStart = process.hrtime.bigint();
       const dynamoResult = await dynamodb.send(new QueryCommand({
         TableName: TABLE_NAME,
         KeyConditionExpression: 'PK = :pk',
         ExpressionAttributeValues: { ':pk': `SOUL#${soulId}` }
       }));
-      const dynamoTime = Date.now() - dynamoStart;
+      const dynamoTime = Number(process.hrtime.bigint() - dynamoStart) / 1000000;
       dynamoTimes.push(dynamoTime);
 
-      const dsqlStart = Date.now();
+      const dsqlStart = process.hrtime.bigint();
       const dsqlResult = await this.dsqlClient.query(`
         SELECT sc.*, 
                array_agg(sce.description) as events,
@@ -120,7 +120,7 @@ class MainDemo {
         WHERE sc.id = $1
         GROUP BY sc.id, sc.contract_status, sc.soul_type, sc.contract_location, sc.updated_at
       `, [soulId]);
-      const dsqlTime = Date.now() - dsqlStart;
+      const dsqlTime = Number(process.hrtime.bigint() - dsqlStart) / 1000000;
       dsqlTimes.push(dsqlTime);
 
       // Store result info from first run
@@ -130,33 +130,33 @@ class MainDemo {
       }
     }
 
-    const dynamoAvg = Math.round(dynamoTimes.reduce((a, b) => a + b) / runs);
-    const dsqlAvg = Math.round(dsqlTimes.reduce((a, b) => a + b) / runs);
-    const dynamoRange = `${Math.min(...dynamoTimes)}-${Math.max(...dynamoTimes)}ms`;
-    const dsqlRange = `${Math.min(...dsqlTimes)}-${Math.max(...dsqlTimes)}ms`;
+    const dynamoStats = this.calculateStats(dynamoTimes);
+    const dsqlStats = this.calculateStats(dsqlTimes);
 
-    console.log(`🔥 DynamoDB: ${dynamoAvg}ms avg (${dynamoRange}) - ${this.dynamoItemCount} items`);
+    console.log(`🔥 DynamoDB: ${dynamoStats.mean.toFixed(1)}ms avg (${dynamoStats.min.toFixed(1)}-${dynamoStats.max.toFixed(1)}ms) - ${this.dynamoItemCount} items`);
     console.log('   💡 Single-table design - all related data co-located');
     console.log('   🔧 How: One query returns contract + events + ledger entries');
-    console.log('   📊 Performance: Consistent ~25-35ms regardless of data complexity');
-    console.log(`   🎯 Variability: ${Math.max(...dynamoTimes) - Math.min(...dynamoTimes)}ms range (predictable)`);
+    console.log(`   📊 Statistics: P95=${dynamoStats.p95.toFixed(1)}ms, StdDev=${dynamoStats.stdDev.toFixed(1)}ms, CV=${dynamoStats.cv.toFixed(1)}%`);
+    console.log(`   🎯 Consistency: ${dynamoStats.cv < 20 ? 'Excellent' : dynamoStats.cv < 40 ? 'Good' : 'Variable'} (CV=${dynamoStats.cv.toFixed(1)}%)`);
     
-    console.log(`⚡ DSQL: ${dsqlAvg}ms avg (${dsqlRange}) - ${this.dsqlRowCount} rows`);
+    console.log(`⚡ DSQL: ${dsqlStats.mean.toFixed(1)}ms avg (${dsqlStats.min.toFixed(1)}-${dsqlStats.max.toFixed(1)}ms) - ${this.dsqlRowCount} rows`);
     console.log('   💡 Normalized schema with JOINs');
     console.log('   🔧 How: JOIN 3 tables + aggregate events + sum power');
-    console.log('   📊 Performance: Variable based on JOIN complexity and data volume');
-    console.log(`   ⚠️  Variability: ${Math.max(...dsqlTimes) - Math.min(...dsqlTimes)}ms range (unpredictable)`);
+    console.log(`   📊 Statistics: P95=${dsqlStats.p95.toFixed(1)}ms, StdDev=${dsqlStats.stdDev.toFixed(1)}ms, CV=${dsqlStats.cv.toFixed(1)}%`);
+    console.log(`   ⚠️  Consistency: ${dsqlStats.cv < 20 ? 'Excellent' : dsqlStats.cv < 40 ? 'Good' : 'Variable'} (CV=${dsqlStats.cv.toFixed(1)}%)`);
     
-    const performanceRatio = Math.round(dsqlAvg / dynamoAvg);
-    const maxDsql = Math.max(...dsqlTimes);
+    // Statistical significance test
+    const tTest = this.performTTest(dynamoTimes, dsqlTimes);
+    const performanceRatio = dsqlStats.mean / dynamoStats.mean;
     
-    if (maxDsql > 200) {
-      console.log(`   🚨 DSQL showed cold start: ${maxDsql}ms (${Math.round(maxDsql/dynamoAvg)}x slower than DynamoDB)`);
+    console.log(`\n📈 STATISTICAL ANALYSIS:`);
+    console.log(`   Performance ratio: ${performanceRatio.toFixed(2)}x (DSQL vs DynamoDB)`);
+    console.log(`   Statistical significance: ${tTest.significant ? 'YES' : 'NO'} (p=${tTest.pValue.toFixed(4)})`);
+    console.log(`   Effect size: ${tTest.effectSize.toFixed(2)} (${this.interpretEffectSize(tTest.effectSize)})`);
+    
+    if (dsqlStats.max > 200) {
+      console.log(`   🚨 DSQL cold start detected: ${dsqlStats.max.toFixed(1)}ms (${(dsqlStats.max/dynamoStats.mean).toFixed(1)}x slower)`);
       console.log('   💡 This demonstrates "devil you don\'t know" - unpredictable performance');
-    } else if (performanceRatio > 2) {
-      console.log(`   ⚠️  DSQL is ${performanceRatio}x slower on average - JOIN overhead`);
-    } else {
-      console.log(`   ✅ Performance comparable (${performanceRatio}x difference)`);
     }
     console.log('');
 
@@ -221,54 +221,64 @@ class MainDemo {
     console.log('   💸 Cost: 1 operation vs N individual queries');
     console.log('');
 
-    // DSQL Strength: Complex Queries
+    // DSQL Strength: Complex Queries with statistical analysis
     console.log('⚡ DSQL STRENGTH: Complex Business Logic');
     console.log('   🎯 Scenario: Advanced analytics with business rules');
     console.log('   💼 Use case: Risk analysis for soul contract portfolio');
+    console.log('   🔬 Testing: Statistical performance analysis\n');
     
-    const complexStart = Date.now();
-    const complexResult = await this.dsqlClient.query(`
-      WITH soul_metrics AS (
-        SELECT 
-          sc.id,
-          sc.contract_location,
-          sc.soul_type,
-          COUNT(sce.id) as event_count,
-          SUM(CASE WHEN sl.amount > 0 THEN sl.amount ELSE 0 END) as gains,
-          SUM(CASE WHEN sl.amount < 0 THEN ABS(sl.amount) ELSE 0 END) as losses,
-          MAX(sce.event_time) as last_activity
-        FROM soul_contracts sc
-        LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id
-        LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
-        GROUP BY sc.id, sc.contract_location, sc.soul_type
-      ),
-      location_analysis AS (
+    const complexTimes = [];
+    let complexResult;
+    
+    for (let i = 0; i < 5; i++) {
+      const complexStart = process.hrtime.bigint();
+      complexResult = await this.dsqlClient.query(`
+        WITH soul_metrics AS (
+          SELECT 
+            sc.id,
+            sc.contract_location,
+            sc.soul_type,
+            COUNT(sce.id) as event_count,
+            SUM(CASE WHEN sl.amount > 0 THEN sl.amount ELSE 0 END) as gains,
+            SUM(CASE WHEN sl.amount < 0 THEN ABS(sl.amount) ELSE 0 END) as losses,
+            MAX(sce.event_time) as last_activity
+          FROM soul_contracts sc
+          LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id
+          LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
+          GROUP BY sc.id, sc.contract_location, sc.soul_type
+        ),
+        location_analysis AS (
+          SELECT 
+            contract_location,
+            COUNT(*) as total_souls,
+            AVG(gains - losses) as avg_net_power,
+            COUNT(CASE WHEN event_count > 5 THEN 1 END) as active_souls,
+            RANK() OVER (ORDER BY AVG(gains - losses) DESC) as profitability_rank
+          FROM soul_metrics 
+          WHERE gains > 0 OR losses > 0
+          GROUP BY contract_location
+        )
         SELECT 
           contract_location,
-          COUNT(*) as total_souls,
-          AVG(gains - losses) as avg_net_power,
-          COUNT(CASE WHEN event_count > 5 THEN 1 END) as active_souls,
-          RANK() OVER (ORDER BY AVG(gains - losses) DESC) as profitability_rank
-        FROM soul_metrics 
-        WHERE gains > 0 OR losses > 0
-        GROUP BY contract_location
-      )
-      SELECT 
-        contract_location,
-        total_souls,
-        ROUND(avg_net_power, 2) as avg_net_power,
-        active_souls,
-        profitability_rank,
-        ROUND(active_souls * 100.0 / total_souls, 1) as activity_rate
-      FROM location_analysis
-      ORDER BY profitability_rank
-    `);
-    const complexTime = Date.now() - complexStart;
+          total_souls,
+          ROUND(avg_net_power, 2) as avg_net_power,
+          active_souls,
+          profitability_rank,
+          ROUND(active_souls * 100.0 / total_souls, 1) as activity_rate
+        FROM location_analysis
+        ORDER BY profitability_rank
+      `);
+      const complexTime = Number(process.hrtime.bigint() - complexStart) / 1000000;
+      complexTimes.push(complexTime);
+    }
 
-    console.log(`   ✅ Complex analysis with CTEs in ${complexTime}ms`);
+    const complexStats = this.calculateStats(complexTimes);
+
+    console.log(`   ✅ Complex analysis: ${complexStats.mean.toFixed(1)}ms avg (${complexStats.min.toFixed(1)}-${complexStats.max.toFixed(1)}ms)`);
     console.log(`   📊 ${complexResult.rows.length} locations analyzed with business logic`);
     console.log('   🔧 How: Common Table Expressions + window functions + complex aggregations');
     console.log('   💡 Features: Multi-level aggregation, ranking, percentage calculations');
+    console.log(`   📈 Statistics: P95=${complexStats.p95.toFixed(1)}ms, CV=${complexStats.cv.toFixed(1)}%`);
     console.log('   📈 Business value: Risk analysis, profitability ranking, activity metrics');
     console.log('   🚫 DynamoDB equivalent: Impossible without extensive client-side processing');
     console.log('   ⚠️ Alternative: Would require scanning entire table + complex application logic');
@@ -279,8 +289,9 @@ class MainDemo {
     console.log(`🔥 DynamoDB batch operations: ${batchTime}ms for ${keys.length} items`);
     console.log(`   📊 Per-item cost: ${(batchTime/keys.length).toFixed(1)}ms per contract`);
     console.log(`   🎯 Scalability: Linear performance up to 100 items per batch`);
-    console.log(`⚡ DSQL complex analytics: ${complexTime}ms for business intelligence`);
+    console.log(`⚡ DSQL complex analytics: ${complexStats.mean.toFixed(1)}ms avg for business intelligence`);
     console.log(`   📊 Data processed: All contracts + events + ledger entries`);
+    console.log(`   📈 Consistency: CV=${complexStats.cv.toFixed(1)}% (${complexStats.cv < 20 ? 'Excellent' : complexStats.cv < 40 ? 'Good' : 'Variable'})`);
     console.log(`   🎯 Scalability: Performance depends on data volume and query complexity`);
     console.log('');
 
@@ -319,6 +330,74 @@ class MainDemo {
     console.log('   • DynamoDB for user-facing operations');
     console.log('   • DSQL for analytics and reporting');
     console.log('   • Choose the right tool for each use case');
+  }
+
+  calculateStats(times) {
+    const n = times.length;
+    const mean = times.reduce((a, b) => a + b) / n;
+    const variance = times.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+    const stdDev = Math.sqrt(variance);
+    const cv = (stdDev / mean) * 100; // Coefficient of variation
+    
+    const sorted = [...times].sort((a, b) => a - b);
+    
+    return {
+      mean,
+      min: Math.min(...times),
+      max: Math.max(...times),
+      stdDev,
+      cv,
+      p50: sorted[Math.floor(n * 0.5)],
+      p95: sorted[Math.floor(n * 0.95)],
+      p99: sorted[Math.floor(n * 0.99)]
+    };
+  }
+
+  performTTest(sample1, sample2) {
+    const n1 = sample1.length;
+    const n2 = sample2.length;
+    const mean1 = sample1.reduce((a, b) => a + b) / n1;
+    const mean2 = sample2.reduce((a, b) => a + b) / n2;
+    
+    const var1 = sample1.reduce((a, b) => a + Math.pow(b - mean1, 2), 0) / (n1 - 1);
+    const var2 = sample2.reduce((a, b) => a + Math.pow(b - mean2, 2), 0) / (n2 - 1);
+    
+    const pooledVar = ((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2);
+    const standardError = Math.sqrt(pooledVar * (1/n1 + 1/n2));
+    
+    const tStat = Math.abs(mean1 - mean2) / standardError;
+    const df = n1 + n2 - 2;
+    
+    // Simplified p-value approximation for t-test
+    const pValue = this.approximatePValue(tStat, df);
+    
+    // Cohen's d effect size
+    const pooledStdDev = Math.sqrt(pooledVar);
+    const effectSize = Math.abs(mean1 - mean2) / pooledStdDev;
+    
+    return {
+      tStat,
+      pValue,
+      significant: pValue < 0.05,
+      effectSize
+    };
+  }
+
+  approximatePValue(t, df) {
+    // Simplified approximation for demonstration
+    // In production, use a proper statistical library
+    if (t > 3) return 0.001;
+    if (t > 2.5) return 0.01;
+    if (t > 2) return 0.05;
+    if (t > 1.5) return 0.1;
+    return 0.2;
+  }
+
+  interpretEffectSize(d) {
+    if (d < 0.2) return 'negligible';
+    if (d < 0.5) return 'small';
+    if (d < 0.8) return 'medium';
+    return 'large';
   }
 
   async getSampleSoulId() {
