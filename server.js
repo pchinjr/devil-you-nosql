@@ -23,15 +23,13 @@ app.post('/api/run-script', (req, res) => {
   const { script, args = [] } = req.body;
   
   const allowedScripts = [
-    'designPhilosophyDemo.js',
-    'contrastDemo.js', 
-    'rigorousContrastBenchmark.js',
-    'rigorousBenchmark.js',
-    'dynamoStrengthDemo.js',
-    'verifyDatabases.js',
+    'setup.js',
+    'demo.js',
+    'benchmark.js',
     'seedSmall.js',
     'seedLarge.js',
-    'test-demo.js'  // Added for demo
+    'verifyDatabases.js',
+    'validate.js'
   ];
 
   if (!allowedScripts.includes(script)) {

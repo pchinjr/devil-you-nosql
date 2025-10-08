@@ -1,0 +1,11 @@
+{
+  "name": "devil-you-nosql-lambdas",
+  "version": "1.0.0",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "@aws-sdk/dsql-signer": "^3.0.0",
+    "pg": "^8.11.0",
+    "uuid": "^9.0.0"
+  }
+}

@@ -290,45 +290,37 @@
         <div id="operations" class="tab-content active">
             <h3>Database Operations</h3>
             <div class="action-buttons">
-                <button class="btn btn-primary" onclick="getSoulProfile()">Get Soul Profile</button>
-                <button class="btn btn-primary" onclick="updateSoulStatus()">Update Soul Status</button>
-                <button class="btn btn-primary" onclick="queryByStatus()">Query by Status</button>
-                <button class="btn btn-primary" onclick="getAnalytics()">Get Analytics</button>
-            </div>
-            
-            <div class="input-group">
-                <label for="soulId">Soul ID (for operations)</label>
-                <input type="text" id="soulId" placeholder="innocent_highway_66_001" value="innocent_highway_66_001">
+                <button class="btn btn-primary" onclick="runSetup()">Complete Setup</button>
+                <button class="btn btn-primary" onclick="runDemo()">Main Demo</button>
+                <button class="btn btn-secondary" onclick="runBenchmark()">Benchmark</button>
+                <button class="btn btn-warning" onclick="verifyDatabases()">Verify DBs</button>
             </div>
         </div>
 
         <div id="benchmarks" class="tab-content">
-            <h3>Performance Benchmarks</h3>
+            <h3>Performance & Data</h3>
             <div class="benchmark-form">
                 <div class="input-group">
-                    <label for="iterations">Iterations</label>
-                    <input type="number" id="iterations" value="50" min="1" max="1000">
+                    <label for="iterations">Benchmark Iterations</label>
+                    <input type="number" id="iterations" value="50" min="1" max="200">
                 </div>
                 <button class="btn btn-warning" onclick="runBenchmark()">Run Benchmark</button>
             </div>
             
             <div class="action-buttons">
-                <button class="btn btn-secondary" onclick="runContrastDemo()">Contrast Demo</button>
-                <button class="btn btn-secondary" onclick="runPhilosophyDemo()">Philosophy Demo</button>
-                <button class="btn btn-secondary" onclick="runRigorousTest()">Rigorous Test</button>
                 <button class="btn btn-primary" onclick="seedData()">Seed Data</button>
-                <button class="btn btn-primary" onclick="verifyDatabases()">Verify DBs</button>
+                <button class="btn btn-secondary" onclick="validateData()">Validate Data</button>
                 <button class="btn btn-warning" onclick="getBenchmarkHistory()">View History</button>
             </div>
         </div>
 
         <div id="demos" class="tab-content">
-            <h3>Interactive Demos</h3>
+            <h3>Quick Actions</h3>
             <div class="action-buttons">
-                <button class="btn btn-primary" onclick="demoUserFacing()">User-Facing Lookup</button>
-                <button class="btn btn-primary" onclick="demoBatchOps()">Batch Operations</button>
-                <button class="btn btn-secondary" onclick="demoAnalytics()">Ad-Hoc Analytics</button>
-                <button class="btn btn-secondary" onclick="demoComplexQuery()">Complex Queries</button>
+                <button class="btn btn-primary" onclick="runSetup()">🚀 Complete Setup</button>
+                <button class="btn btn-primary" onclick="runDemo()">🎭 Main Demo</button>
+                <button class="btn btn-secondary" onclick="runBenchmark()">📊 Benchmark</button>
+                <button class="btn btn-warning" onclick="seedData()">🌱 Seed Data</button>
             </div>
         </div>
 
@@ -695,70 +687,30 @@
             await executeScript('rigorousContrastBenchmark.js', [iterations]);
         }
 
-        // Demo functions - now using real scripts
-        async function runContrastDemo() {
-            await executeScript('contrastDemo.js');
+        // Core functions
+        async function runSetup() {
+            await executeScript('setup.js');
         }
 
-        async function runPhilosophyDemo() {
-            await executeScript('designPhilosophyDemo.js');
+        async function runDemo() {
+            await executeScript('demo.js');
         }
 
-        async function runRigorousTest() {
+        async function runBenchmark() {
             const iterations = document.getElementById('iterations').value || '50';
-            await executeScript('rigorousBenchmark.js', [iterations]);
+            await executeScript('benchmark.js', [iterations]);
         }
 
-        async function demoUserFacing() {
-            await executeScript('contrastDemo.js');
-        }
-
-        async function demoBatchOps() {
-            await executeScript('dynamoStrengthDemo.js');
-        }
-
-        async function demoAnalytics() {
-            await executeScript('contrastDemo.js');
-        }
-
-        async function demoComplexQuery() {
-            await executeScript('rigorousContrastBenchmark.js', ['10']);
-        }
-
-        // Database operations - simplified for demo
-        async function getSoulProfile() {
-            showResults({
-                info: 'This would call your Lambda endpoints',
-                suggestion: 'Use the benchmark scripts to see real database performance',
-                tip: 'Try "Run Contrast Demo" to see actual database interactions'
-            });
-        }
-
-        async function updateSoulStatus() {
-            showResults({
-                info: 'This would call your Lambda endpoints',
-                suggestion: 'Deploy your SAM template first, then update the endpoints above'
-            });
-        }
-
-        async function queryByStatus() {
-            showResults({
-                info: 'This would call your Lambda endpoints',
-                suggestion: 'Use the benchmark scripts to see real query performance'
-            });
-        }
-
-        async function getAnalytics() {
-            await executeScript('contrastDemo.js');
-        }
-
-        // Add utility functions
         async function seedData() {
             await executeScript('seedSmall.js');
         }
 
         async function verifyDatabases() {
             await executeScript('verifyDatabases.js');
+        }
+
+        async function validateData() {
+            await executeScript('validate.js');
         }
 
         async function getBenchmarkHistory() {

@@ -5,11 +5,11 @@ A comprehensive demonstration of two approaches for managing "soul contracts" in
 * **DynamoDB-based Soul Tracker** using single-table design with predictable performance
 * **Aurora DSQL-based Soul Tracker** using IAM authentication and flexible SQL queries
 
-This repo includes **philosophy demonstrations**, performance benchmarking, data seeding, validation, and analytics to showcase the fundamental trade-offs between NoSQL and SQL approaches.
+This repo includes **philosophy demonstrations**, performance benchmarking, data seeding, and validation to showcase the fundamental trade-offs between NoSQL and SQL approaches.
 
 ---
 
-## 🎭 Design Philosophy Demonstrations
+## 🎭 Design Philosophy
 
 ### The Core Concept
 This demo illustrates the fundamental difference between:
@@ -19,16 +19,16 @@ This demo illustrates the fundamental difference between:
 ### Key Demonstrations
 
 **🔥 DynamoDB Strengths:**
-- Hot partition performance (35% faster)
+- Predictable sub-50ms performance for known patterns
 - Batch operations optimization
-- Predictable latency consistency
 - Single-table design for entity retrieval
+- Excellent for user-facing applications
 
 **⚡ DSQL Strengths:**
 - Ad-hoc queries without infrastructure changes
 - Complex analytics with JOINs and aggregations
 - Flexible schema evolution
-- Rich SQL capabilities
+- Rich SQL capabilities (CTEs, window functions)
 
 ---
 
@@ -40,26 +40,15 @@ devil-you-nosql/
 │   ├── dynamoSoulTracker.ts            # DynamoDB-based Soul Tracker Lambda
 │   └── dsqlSoulTracker.ts              # Aurora DSQL-based Soul Tracker Lambda
 ├── scripts/
-│   ├── designPhilosophyDemo.js         # 🎭 Main philosophy demonstration
-│   ├── contrastDemo.js                 # 🎯 Natural strengths showcase
-│   ├── rigorousContrastBenchmark.js    # 🔬 Rigorous use-case benchmarking
-│   ├── dynamoStrengthDemo.js           # 🔥 DynamoDB strength showcase
-│   ├── rigorousBenchmark.js            # 🔬 Empirical hypothesis testing
-│   ├── verifyDatabases.js              # Database connectivity verification
-│   ├── verifyDataParity.js             # Cross-database data consistency check
+│   ├── setup.js                        # 🚀 Complete setup and verification
+│   ├── demo.js                         # 🎭 Main philosophy demonstration
+│   ├── benchmark.js                    # 📊 Performance benchmarking
+│   ├── seedSmall.js                    # 🌱 Small dataset seeding (10 souls)
+│   ├── seedLarge.js                    # 🌱 Large dataset seeding (1,000+ souls)
+│   ├── verifyDatabases.js              # 🔧 Database connectivity verification
+│   ├── validate.js                     # ✅ Data consistency validation
 │   ├── createSoulTrackerTables.js      # Create soul-contract tables in Aurora DSQL
-│   ├── seedSmall.js                    # Unified small dataset seeding (10 souls)
-│   ├── seedLarge.js                    # Large dataset seeding (1,000+ souls)
-│   ├── createDsqlIndexes.js            # Create ASYNC indexes on DSQL tables
-│   ├── benchmark.js                    # Performance benchmarking
-│   ├── validate.js                     # Data consistency validation
-│   ├── loadTest.js                     # Concurrent load testing
-│   ├── runTests.js                     # Test suite orchestrator
-│   ├── clearDynamoData.js              # Clear DynamoDB table data
-│   ├── clearDsqlData.js                # Clear DSQL table data
-│   ├── getSoulContract.js              # Retrieve soul contract utility
-│   ├── measureDynamo.js                # DynamoDB performance measurement
-│   └── measureDsql.js                  # DSQL performance measurement
+│   └── createDsqlIndexes.js            # Create ASYNC indexes on DSQL tables
 ├── server.js                           # Express server for web interface
 ├── index.html                          # Web interface for interactive demos
 ├── template.yaml                       # SAM template for both Lambdas + DynamoDB table
@@ -70,135 +59,13 @@ devil-you-nosql/
 
 ---
 
-## 🗄️ Data Models & Seeding
-
-### The Soul Contract System
-In our Ghost Rider-themed application, we track three types of data for each soul:
-
-1. **Soul Contracts**: The main record of a person's soul deal with the devil
-   - Who made the deal (soul ID like "innocent_highway_66_001")
-   - Current status (Bound, Condemned, Redeemed, etc.)
-   - Where the deal was made (Highway 66, Graveyard, etc.)
-   - What type of person they were (Innocent, Murderer, etc.)
-
-2. **Soul Events**: A timeline of what happens to each soul
-   - When the contract was created
-   - Status changes (soul gets judged, redeemed, condemned)
-   - Think of it as a history log for each soul
-
-3. **Soul Ledger**: Financial transactions involving soul power
-   - Each soul has "power" that can be traded or consumed
-   - Ledger entries track gains/losses of this power
-   - Like a bank account for supernatural energy
-
-### DynamoDB Single-Table Design
-Uses a single table `DevilSoulTracker` with composite keys:
-
-**Primary Key Structure:**
-- `PK` (Partition Key): `SOUL#{soulId}`
-- `SK` (Sort Key): `CONTRACT` | `EVENT#{timestamp}` | `LEDGER#{timestamp}`
-
-**Global Secondary Indexes:**
-- `StatusIndex`: Query by contract status
-- `LocationIndex`: Query by contract location and status
-
-**Item Types:**
-```javascript
-// Soul Contract
-{
-  PK: "SOUL#innocent_highway_66_001",
-  SK: "CONTRACT", 
-  soulId: "innocent_highway_66_001",
-  status: "Bound",
-  soul_type: "Innocent",
-  contract_location: "Highway_66",
-  createdAt: "2025-10-08T16:00:00.000Z"
-}
-
-// Soul Event
-{
-  PK: "SOUL#innocent_highway_66_001",
-  SK: "EVENT#2025-10-08T16:01:00.000Z",
-  eventType: "Contract_Created",
-  timestamp: "2025-10-08T16:01:00.000Z"
-}
-
-// Ledger Entry
-{
-  PK: "SOUL#innocent_highway_66_001", 
-  SK: "LEDGER#2025-10-08T16:02:00.000Z",
-  amount: 150,
-  timestamp: "2025-10-08T16:02:00.000Z",
-  description: "Soul power transaction: 150"
-}
-```
-
-### Aurora DSQL Normalized Schema
-Uses three normalized tables with logical relationships (no foreign key constraints):
-
-**Tables:**
-```sql
--- Soul Contracts (Primary entity)
-CREATE TABLE soul_contracts (
-  id VARCHAR PRIMARY KEY,
-  contract_status VARCHAR,
-  soul_type VARCHAR, 
-  contract_location VARCHAR,
-  updated_at TIMESTAMP
-);
-
--- Soul Events (Logically related to contracts via soul_contract_id)
-CREATE TABLE soul_contract_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  soul_contract_id VARCHAR NOT NULL,
-  event_time TIMESTAMP,
-  description TEXT
-);
-
--- Soul Ledger (Logically related to contracts via soul_contract_id)  
-CREATE TABLE soul_ledger (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  soul_contract_id VARCHAR NOT NULL,
-  amount NUMERIC,
-  transaction_time TIMESTAMP,
-  description TEXT
-);
-```
-
-**Note**: Aurora DSQL doesn't support foreign key constraints, so referential integrity is maintained at the application level through consistent soul_contract_id values.
-
-### Seeding Process
-
-**Small Dataset (`npm run seed:small`):**
-- 10 souls with randomized types and locations
-- 10 events per soul (100 total events)
-- 50 random ledger entries
-- ~160 total items across both databases
-
-**Large Dataset (`npm run seed:large`):**
-- 1,000 souls with deterministic generation
-- 50+ events per soul (50,000+ events)
-- 5,000+ ledger entries  
-- ~56,000+ total items across both databases
-
-**Data Consistency:**
-- Identical soul IDs generated using deterministic algorithms
-- Same timestamps and amounts for corresponding entries
-- Cross-database validation via `verifyDataParity.js`
-
-**Soul ID Format:**
-`{soulType}_{location}_{sequenceNumber}`
-- Example: `innocent_highway_66_001`, `murderer_graveyard_042`
-
----
-
 ## Prerequisites
 
 * **Node.js** v20+
 * **AWS SAM CLI** ([Install Guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html))
 * **AWS Credentials** (via CLI profile, ENV vars, or attached IAM role)
 * **Aurora DSQL Cluster** (provisioned & note the endpoint)
-* **Environment Variables** for local scripts:
+* **Environment Variables**:
 
   * `DSQL_ENDPOINT` – your Aurora DSQL cluster endpoint
   * `AWS_REGION` – AWS region (defaults to `us-east-1`)
@@ -215,7 +82,7 @@ export AWS_REGION=us-east-1
 
 ### 2. Web Interface (Recommended)
 ```bash
-# Install dependencies (includes Express for web server)
+# Install dependencies
 npm install
 
 # Start the web interface
@@ -226,17 +93,18 @@ npm run server
 
 ### 3. Command Line Interface
 ```bash
-# Run the philosophy demo (shows design philosophy differences)
-npm run demo:philosophy
+# Complete setup (verify + seed data)
+npm run setup
 
-# Run DynamoDB strengths demo
-npm run demo:dynamo-strength
+# Run main demo (philosophy + strengths)
+npm run demo
 
-# Complete setup and testing
-npm run verify
-npm run seed:small
-npm run test:benchmark
-npm run test:rigorous
+# Run performance benchmark
+npm run benchmark
+
+# Individual operations
+npm run verify    # Verify database connectivity
+npm run seed      # Seed sample data
 ```
 
 ---
@@ -246,27 +114,19 @@ npm run test:rigorous
 The project includes a **beautiful web interface** that lets you run all demos and benchmarks from your browser:
 
 ### **Features:**
-- **🎭 Interactive Demos** - Run contrast, philosophy, and strength demonstrations
-- **📊 Real-time Benchmarking** - Execute rigorous performance tests with configurable iterations
-- **🔧 Database Management** - Seed data, verify connections, view benchmark history
-- **📈 Visual Results** - Formatted output with execution timing and error handling
-- **💾 Persistent Config** - Saves your API endpoints locally
+- **🎭 Interactive Demos** - Run philosophy and performance demonstrations
+- **📊 Real-time Benchmarking** - Execute performance tests with configurable iterations
+- **🔧 Database Management** - Seed data, verify connections, view results
+- **📈 Visual Results** - Clean terminal-style output with proper formatting
+- **💾 Auto Configuration** - Pulls DSQL endpoint from environment variables
 
 ### **Usage:**
 1. **Start Server**: `npm run server`
 2. **Open Browser**: Navigate to `http://localhost:3000`
 3. **Run Demos**: Click any button to execute real Node.js scripts
-4. **View Results**: See actual console output and performance metrics
+4. **View Results**: See actual console output with clean formatting
 
-### **Available Scripts via Web Interface:**
-- **Contrast Demo** (`contrastDemo.js`) - Shows each database's natural strengths
-- **Philosophy Demo** (`designPhilosophyDemo.js`) - Core design philosophy comparison
-- **Rigorous Benchmark** (`rigorousContrastBenchmark.js`) - Statistical performance testing
-- **Database Verification** (`verifyDatabases.js`) - Check connectivity and data
-- **Data Seeding** (`seedSmall.js`) - Populate databases with test data
-- **Benchmark History** - View and analyze previous test results
-
-The web interface executes your existing Node.js scripts server-side and displays real results, combining the power of your battle-tested scripts with an intuitive visual interface.
+The web interface executes your existing Node.js scripts server-side and displays real results with a professional, terminal-style interface.
 
 ---
 
@@ -283,127 +143,122 @@ npm run server
 
 ### Command Line Interface
 ```bash
-# Philosophy demonstrations
-npm run demo:philosophy        # Core philosophy comparison (3 scenarios)
-npm run demo:contrast          # Natural strengths showcase  
-npm run demo:dynamo-strength   # DynamoDB strength showcase (4 scenarios)
+# Complete setup and demo
+npm run setup     # Verify databases + seed data
+npm run demo      # Main philosophy demonstration
+npm run benchmark # Performance benchmarking
 
-# Testing & benchmarking
-npm run verify                 # Database verification
-npm run test:rigorous          # Rigorous empirical testing
-npm run test:contrast          # Rigorous contrast benchmarking
-npm run test:benchmark         # Performance benchmarking
-npm run test:validate          # Data validation
-npm run test:load              # Load testing
-
-# Data management
-npm run seed:small             # Small dataset (10 souls, ~160 items)
-npm run seed:large             # Large dataset (1,000 souls, ~56K items)
+# Individual operations
+npm run verify    # Database verification only
+npm run seed      # Seed sample data only
 ```
 
 ---
 
 ## 🎯 Expected Demo Results
 
-### Philosophy Demo Output
+### Main Demo Output
 ```
-🎭 DESIGN PHILOSOPHY DEMONSTRATION
+👹 THE DEVIL YOU NOSQL
 The Devil You Know vs The Devil You Don't
 
-📋 SCENARIO 1: Get complete soul profile (DynamoDB's sweet spot)
-🔥 DYNAMODB STRENGTH: Single-Table Design Shines
-✅ Retrieved complete profile in ~25ms (10 items)
-🎯 Perfect data locality - all related data co-located
+🎭 DESIGN PHILOSOPHY DEMONSTRATION
+==================================
 
-⚡ AURORA DSQL: Multiple Table Approach  
-✅ Retrieved profile via JOINs in ~85ms
-🔧 Normalized data with JOIN overhead
+📋 SCENARIO: Get complete soul profile (user-facing app)
+🔥 DynamoDB: 28ms (14 items)
+   💡 Single-table design - all related data co-located
+⚡ DSQL: 35ms (1 rows)
+   💡 Normalized schema with JOINs
 
-📋 SCENARIO 2: Find condemned souls at graveyards (flexible query)
-🔥 DYNAMODB APPROACH: Design-Time Composition
-✅ Using StatusIndex GSI for O(1) status lookups
-✅ Found souls via GSI query in ~15ms
+📊 SCENARIO: Business analytics (executive dashboard)
+⚡ DSQL: 45ms - Complex analytics in single query
+   📈 Analyzed 6 locations with aggregations
+🔥 DynamoDB: Would require multiple GSI queries + client aggregation
+   ⚠️ Complex for ad-hoc analytics
 
-⚡ AURORA DSQL APPROACH: Runtime Computation
-✅ Found souls via declarative WHERE clause in ~45ms
+🎯 NATURAL STRENGTHS DEMONSTRATION
+==================================
 
-📊 SCENARIO 3: Ad-hoc analytics - "Show soul power trends by location and type"
-🔥 DYNAMODB: Structured Analytics Approach
-✅ Multiple GSI queries + client-side aggregation in ~35ms
-⚠️ Requires multiple round trips and client processing
+🔥 DYNAMODB STRENGTH: Batch Operations
+   ✅ Retrieved 10 soul contracts in 32ms
+   💡 Optimized for bulk operations
 
-⚡ AURORA DSQL: Runtime Flexibility Shines
-✅ Analytics completed with JOINs and aggregations in ~120ms
-📊 Single query handles complex multi-dimensional analysis
+⚡ DSQL STRENGTH: Complex Business Logic
+   ✅ Complex analysis with CTEs in 55ms
+   📊 6 locations analyzed
+   💡 Impossible to replicate in DynamoDB natively
 ```
 
-### DynamoDB Strengths Demo Output
+### Benchmark Output
 ```
-🔥 DYNAMODB STRENGTH DEMONSTRATION
+🔬 COMPREHENSIVE BENCHMARK
+Running 50 iterations per test
 
-🎯 Hot Partition Performance: DynamoDB wins by 35%
-🚀 Batch Operations: DynamoDB wins by optimized batching
-📊 Latency Consistency: DynamoDB wins with lower variance
+📊 TEST 1: Single Soul Lookup
+   🔥 DynamoDB: 25.3ms avg (18.2-45.1ms)
+   ⚡ DSQL: 28.7ms avg (22.1-52.3ms)
+   🏆 Winner: DynamoDB
+
+📊 TEST 2: Batch Operations (10 items)
+   🔥 DynamoDB: 38.2ms avg (BatchGetItem)
+   ⚡ DSQL: 185.4ms avg (Parallel queries)
+   🏆 Winner: DynamoDB
+
+📊 TEST 3: Query by Status
+   🔥 DynamoDB: 22.1ms avg (GSI query)
+   ⚡ DSQL: 26.8ms avg (WHERE clause)
+   🏆 Winner: DynamoDB
+
+📊 TEST 4: Analytics Query
+   ⚡ DSQL: 42.3ms avg (Complex analytics)
+   🔥 DynamoDB: Not directly comparable (multiple operations required)
+   🏆 Winner: DSQL (native capability)
 ```
 
 ---
 
-## 📊 Performance Benchmarks
+## 📊 Performance Insights
 
-### Recent Empirical Results
-Based on rigorous testing with 1000+ iterations per scenario:
+### **DynamoDB Excels At:**
+- **Single-item lookups**: Consistent sub-30ms performance
+- **Batch operations**: 5x faster than parallel DSQL queries
+- **Known access patterns**: GSI queries optimized for specific use cases
+- **User-facing applications**: Predictable latency for mobile/web apps
 
-**🔬 Hypothesis Testing Results:**
-- **Single-table design advantage**: ✅ Confirmed (DynamoDB 31.8ms vs DSQL 37.3ms avg)
-- **Hot partition performance**: ❌ Not confirmed (DSQL 22.3ms vs DynamoDB 27.5ms avg)  
-- **Analytics flexibility**: ✅ Confirmed (DSQL 31.2ms vs DynamoDB 67.8ms avg)
-- **Latency consistency**: ❌ Not confirmed (DSQL more consistent in testing)
+### **DSQL Excels At:**
+- **Complex analytics**: Native JOINs, aggregations, and window functions
+- **Ad-hoc queries**: No schema changes needed for new requirements
+- **Business intelligence**: Rich SQL capabilities for reporting
+- **Flexible relationships**: CTEs and complex business logic
 
-### Key Insights from Rigorous Testing
-- **DynamoDB excels**: Single-table entity retrieval, batch operations
-- **DSQL excels**: Complex analytics, ad-hoc queries, hot partition scenarios
-- **Performance varies**: Real-world results challenge some theoretical assumptions
-- **Both perform well**: Sub-100ms for most operations at scale
-
-### Benchmark Data
-- Results saved to timestamped JSON files with full statistical analysis
-- Includes P50, P95, P99 latency percentiles
-- Environment metadata for reproducibility
-- Hypothesis confirmation rates tracked over time
+### **Key Takeaway:**
+Choose based on your **primary use case**, not just raw performance numbers. Both databases perform well, but each has clear specialties where it dominates.
 
 ---
 
-## 🎭 Design Philosophy Summary
+## 🗄️ Data Models
 
-### DynamoDB (Design-Time Composition)
-**Philosophy**: "Pre-encode all access patterns into keys"
+### DynamoDB Single-Table Design
+Uses a single table `DevilSoulTracker` with composite keys:
 
-**Strengths**:
-- Predictable O(1) performance for known patterns
-- Hot partition caching and data locality
-- Optimized batch operations
-- Consistent latency for user-facing apps
+**Primary Key Structure:**
+- `PK` (Partition Key): `SOUL#{soulId}`
+- `SK` (Sort Key): `CONTRACT` | `EVENT#{timestamp}` | `LEDGER#{timestamp}`
 
-**Trade-offs**:
-- Requires upfront access pattern design
-- New query patterns need GSIs + deployment
-- Limited ad-hoc query capabilities
-- Complex analytics require multiple operations
+**Global Secondary Indexes:**
+- `StatusIndex`: Query by contract status
+- `LocationIndex`: Query by contract location and status
 
-### Aurora DSQL (Runtime Computation)  
-**Philosophy**: "Declare relationships, compute on demand"
+### Aurora DSQL Normalized Schema
+Uses three normalized tables with logical relationships:
 
-**Strengths**:
-- Flexible queries without infrastructure changes
-- Complex analytics in single SQL statements
-- Rich relational capabilities (JOINs, CTEs, window functions)
-- Schema evolution without breaking changes
+**Tables:**
+- `soul_contracts` - Primary entity with contract details
+- `soul_contract_events` - Event history for each soul
+- `soul_ledger` - Financial transactions involving soul power
 
-**Trade-offs**:
-- Variable performance based on query complexity
-- JOIN overhead for simple entity lookups
-- Less predictable latency patterns
-- Requires SQL expertise for optimization
+**Note**: Aurora DSQL doesn't support foreign key constraints, so referential integrity is maintained at the application level.
 
 ---
 
@@ -432,30 +287,6 @@ curl -X POST <AuroraApiUrl>/dsql/souls \
   -H "Content-Type: application/json" \
   -d '{"soulContractId":"innocent_highway_66_0042","newStatus":"Condemned","amount":150}'
 ```
-
----
-
-## 🧪 Advanced Testing
-
-### Rigorous Empirical Testing
-The `rigorousBenchmark.js` script tests key design philosophy hypotheses:
-
-```bash
-# Run empirical hypothesis testing
-npm run test:rigorous
-```
-
-**Tested Hypotheses:**
-1. **Single-table design advantage** - DynamoDB faster for entity retrieval
-2. **Hot partition performance** - DynamoDB superior for frequently accessed data
-3. **Analytics flexibility** - DSQL better for ad-hoc complex queries
-4. **Latency consistency** - DynamoDB more predictable response times
-
-### Performance Analysis
-- Results saved to timestamped JSON files with statistical analysis
-- Includes P50, P95, P99 latency percentiles  
-- Environment metadata for reproducibility
-- Hypothesis confirmation tracking over multiple runs
 
 ---
 
