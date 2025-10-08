@@ -175,14 +175,23 @@
             color: #ffd93d;
         }
 
-        .results pre {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 5px;
+        .terminal-output {
+            background: #1e1e1e;
+            padding: 25px;
+            border-radius: 8px;
             overflow-x: auto;
+            border: 1px solid #333;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .terminal-output pre {
+            margin: 0;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #e6e6e6;
             white-space: pre-wrap;
-            font-size: 12px;
-            line-height: 1.4;
+            word-wrap: break-word;
         }
 
         .benchmark-form {
@@ -330,7 +339,7 @@
 
         <div class="results" id="results" style="display: none;">
             <h3>Results</h3>
-            <pre id="resultsContent"></pre>
+            <div class="terminal-output" id="resultsContent"></div>
         </div>
     </div>
 
@@ -412,7 +421,18 @@
         }
 
         function showResults(content) {
-            document.getElementById('resultsContent').textContent = JSON.stringify(content, null, 2);
+            let formattedOutput = '';
+            
+            if (content.output || content.stdout) {
+                // Clean terminal output - just preserve structure
+                const output = content.output || content.stdout;
+                formattedOutput = `<pre>${output}</pre>`;
+            } else {
+                // Clean JSON with better spacing
+                formattedOutput = `<pre>${JSON.stringify(content, null, 2)}</pre>`;
+            }
+            
+            document.getElementById('resultsContent').innerHTML = formattedOutput;
             document.getElementById('results').style.display = 'block';
         }
 
