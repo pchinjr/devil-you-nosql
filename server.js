@@ -25,7 +25,6 @@ app.post('/api/run-script', (req, res) => {
   const allowedScripts = [
     'setup.js',
     'demo.js',
-    'benchmark.js',
     'seedSmall.js',
     'seedLarge.js',
     'verifyDatabases.js',

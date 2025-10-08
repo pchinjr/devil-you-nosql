@@ -41,8 +41,7 @@ devil-you-nosql/
 │   └── dsqlSoulTracker.ts              # Aurora DSQL-based Soul Tracker Lambda
 ├── scripts/
 │   ├── setup.js                        # 🚀 Complete setup and verification
-│   ├── demo.js                         # 🎭 Main philosophy demonstration
-│   ├── benchmark.js                    # 📊 Performance benchmarking
+│   ├── demo.js                         # 🎭 Main philosophy demonstration with performance analysis
 │   ├── seedSmall.js                    # 🌱 Small dataset seeding (10 souls)
 │   ├── seedLarge.js                    # 🌱 Large dataset seeding (1,000+ souls)
 │   ├── verifyDatabases.js              # 🔧 Database connectivity verification
@@ -96,11 +95,8 @@ npm run server
 # Complete setup (verify + seed data)
 npm run setup
 
-# Run main demo (philosophy + strengths)
+# Run main demo (philosophy + performance analysis)
 npm run demo
-
-# Run performance benchmark
-npm run benchmark
 
 # Individual operations
 npm run verify    # Verify database connectivity
@@ -115,7 +111,7 @@ The project includes a **beautiful web interface** that lets you run all demos a
 
 ### **Features:**
 - **🎭 Interactive Demos** - Run philosophy and performance demonstrations
-- **📊 Real-time Benchmarking** - Execute performance tests with configurable iterations
+- **📊 Real-time Analysis** - Execute performance tests with variability detection
 - **🔧 Database Management** - Seed data, verify connections, view results
 - **📈 Visual Results** - Clean terminal-style output with proper formatting
 - **💾 Auto Configuration** - Pulls DSQL endpoint from environment variables
@@ -145,8 +141,7 @@ npm run server
 ```bash
 # Complete setup and demo
 npm run setup     # Verify databases + seed data
-npm run demo      # Main philosophy demonstration
-npm run benchmark # Performance benchmarking
+npm run demo      # Main philosophy demonstration with performance analysis
 
 # Individual operations
 npm run verify    # Database verification only
@@ -157,7 +152,7 @@ npm run seed      # Seed sample data only
 
 ## 🎯 Expected Demo Results
 
-### Main Demo Output
+### Demo Output with Variability Analysis
 ```
 👹 THE DEVIL YOU NOSQL
 The Devil You Know vs The Devil You Don't
@@ -166,54 +161,30 @@ The Devil You Know vs The Devil You Don't
 ==================================
 
 📋 SCENARIO: Get complete soul profile (user-facing app)
-🔥 DynamoDB: 28ms (14 items)
+🔥 DynamoDB: 36ms avg (35-36ms) - 14 items
    💡 Single-table design - all related data co-located
-⚡ DSQL: 35ms (1 rows)
+   🎯 Variability: 1ms range (predictable)
+⚡ DSQL: 71ms avg (24-157ms) - 1 rows
    💡 Normalized schema with JOINs
+   ⚠️ Variability: 133ms range (unpredictable)
+   🚨 DSQL showed cold start: 157ms (4x slower than DynamoDB)
 
 📊 SCENARIO: Business analytics (executive dashboard)
-⚡ DSQL: 45ms - Complex analytics in single query
+⚡ DSQL: 23ms - Complex analytics in single query
    📈 Analyzed 6 locations with aggregations
 🔥 DynamoDB: Would require multiple GSI queries + client aggregation
-   ⚠️ Complex for ad-hoc analytics
+   ⚠️ Complexity: 3-4 separate queries + application logic
 
 🎯 NATURAL STRENGTHS DEMONSTRATION
 ==================================
 
 🔥 DYNAMODB STRENGTH: Batch Operations
-   ✅ Retrieved 10 soul contracts in 32ms
+   ✅ Retrieved 8 soul contracts in 37ms
    💡 Optimized for bulk operations
 
 ⚡ DSQL STRENGTH: Complex Business Logic
-   ✅ Complex analysis with CTEs in 55ms
-   📊 6 locations analyzed
+   ✅ Complex analysis with CTEs in 28ms
    💡 Impossible to replicate in DynamoDB natively
-```
-
-### Benchmark Output
-```
-🔬 COMPREHENSIVE BENCHMARK
-Running 50 iterations per test
-
-📊 TEST 1: Single Soul Lookup
-   🔥 DynamoDB: 25.3ms avg (18.2-45.1ms)
-   ⚡ DSQL: 28.7ms avg (22.1-52.3ms)
-   🏆 Winner: DynamoDB
-
-📊 TEST 2: Batch Operations (10 items)
-   🔥 DynamoDB: 38.2ms avg (BatchGetItem)
-   ⚡ DSQL: 185.4ms avg (Parallel queries)
-   🏆 Winner: DynamoDB
-
-📊 TEST 3: Query by Status
-   🔥 DynamoDB: 22.1ms avg (GSI query)
-   ⚡ DSQL: 26.8ms avg (WHERE clause)
-   🏆 Winner: DynamoDB
-
-📊 TEST 4: Analytics Query
-   ⚡ DSQL: 42.3ms avg (Complex analytics)
-   🔥 DynamoDB: Not directly comparable (multiple operations required)
-   🏆 Winner: DSQL (native capability)
 ```
 
 ---
