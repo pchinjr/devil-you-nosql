@@ -144,19 +144,26 @@ The project includes a **beautiful web interface** with two clear sections:
 
 📋 SCENARIO: Complete soul profile (user-facing app)
 🔥 DynamoDB: 31.8ms avg (24.8-47.7ms) - CV=24.6% (Good consistency)
+   Translation: "Takes about 32ms, usually between 25-48ms. Reliable."
 ⚡ DSQL: 55.2ms avg (30.5-173.2ms) - CV=79.5% (High variability)
+   Translation: "Takes about 55ms, but could be 30ms or 170ms. Unpredictable."
 📈 Performance ratio: 1.74x (DSQL slower, not statistically significant)
 🚨 Cold start detected: DSQL spiked to 173ms (5.4x slower)
 
 📊 SCENARIO: Business analytics (executive dashboard)
 ⚡ DSQL: 61ms - Single complex query with JOINs and aggregations
+   Translation: "One query does everything in 61ms."
 🔥 DynamoDB: 1,109ms - 35 separate queries + client-side processing
+   Translation: "Need 35 different queries, takes over 1 second."
 📈 Performance ratio: 18.2x faster with DSQL for analytics
 
 🔥 SCENARIO: Batch operations (dashboard loading)
 🥇 DynamoDB BatchGet: 37ms (winner - purpose-built)
+   Translation: "Gets 8 items in 37ms using special batch operation."
 🥈 DSQL Parallel: 228ms (6.2x slower - no native batching)
+   Translation: "Gets 8 items in 228ms using 8 separate queries."
 🥉 DynamoDB Individual: 320ms (8.6x slower - network overhead)
+   Translation: "Gets 8 items in 320ms the slow way (don't do this)."
 ```
 
 ### Key Performance Insights
@@ -174,6 +181,11 @@ The project includes a **beautiful web interface** with two clear sections:
 - **DSQL cold starts**: Can spike to 300ms+ unpredictably
 - **DynamoDB consistency**: Stays within narrow performance bands
 - **Statistical significance**: Most differences not statistically significant due to DSQL variability
+
+**💡 What This Means:**
+- **DynamoDB**: Like a reliable train - arrives on schedule, every time
+- **DSQL**: Like a taxi - might be fast, might be stuck in traffic
+- **Choose based on**: Whether you need reliability or flexibility more
 
 ---
 
@@ -270,27 +282,67 @@ curl -X POST <AuroraApiUrl>/dsql/souls \
 
 ---
 
-## 🧪 Statistical Methodology
+## 🧪 Understanding the Statistics (Made Simple)
 
-### Rigorous Testing Approach
-- **10 iterations** per test for statistical power
-- **High-precision timing** using `process.hrtime.bigint()`
-- **Statistical significance testing** with t-tests and p-values
-- **Effect size calculation** (Cohen's d) for practical significance
-- **Coefficient of variation** analysis for consistency measurement
+### What We Measure and Why It Matters
 
-### Key Metrics Tracked
-- **Mean, Standard Deviation, P95** for performance distribution
-- **Coefficient of Variation (CV)** for consistency analysis
-- **Cold start detection** for DSQL variability
-- **Network efficiency** for batch operations
-- **Query complexity** impact on performance
+**🎯 Why Statistics Matter:**
+Think of database performance like a bus schedule. Some buses (DynamoDB) arrive consistently within 2-3 minutes of the posted time. Other buses (DSQL) might arrive in 2 minutes or 15 minutes - you never know. Statistics help us measure this reliability.
 
-### Statistical Findings
-- **Performance differences** often not statistically significant due to DSQL variability
-- **Consistency differences** are highly significant (DynamoDB much more predictable)
-- **Use case specialization** shows dramatic performance differences (18x for analytics)
-- **Architectural choices** have measurable real-world impact
+### Key Metrics Explained
+
+**📊 Average (Mean):**
+- **What it is**: Add up all response times, divide by number of tests
+- **Example**: If 10 tests took 20ms, 30ms, 25ms... the average might be 25ms
+- **Why it matters**: Gives you the "typical" performance to expect
+
+**📈 Coefficient of Variation (CV):**
+- **What it is**: How much performance varies, as a percentage
+- **Low CV (under 30%)**: Predictable, like a reliable bus schedule
+- **High CV (over 50%)**: Unpredictable, like a bus that might be very early or very late
+- **Example**: DynamoDB CV=25% means performance stays close to average. DSQL CV=87% means it varies wildly
+
+**⚡ P95 (95th Percentile):**
+- **What it is**: 95% of requests finish faster than this time
+- **Example**: P95=100ms means only 5% of users wait longer than 100ms
+- **Why it matters**: Shows your "worst case" user experience
+
+**🔬 Statistical Significance:**
+- **What it is**: Whether performance differences are real or just random luck
+- **p-value < 0.05**: The difference is probably real
+- **p-value > 0.05**: Could just be random chance
+- **Why it matters**: Prevents making decisions based on coincidence
+
+### Real-World Translation
+
+**🔥 DynamoDB Results:**
+```
+Average: 32ms, CV=25%, P95=47ms
+Translation: "Usually takes 32ms, rarely varies much, 
+worst case is 47ms. Very predictable."
+```
+
+**⚡ DSQL Results:**
+```
+Average: 55ms, CV=87%, P95=173ms  
+Translation: "Usually takes 55ms, but could be 30ms or 170ms. 
+Sometimes much slower. Unpredictable."
+```
+
+### What This Means for Your App
+
+**📱 For User-Facing Features (like mobile apps):**
+- **DynamoDB**: Users get consistent experience (always fast)
+- **DSQL**: Users might get frustrated by random slowness
+
+**📊 For Analytics (like business reports):**
+- **DynamoDB**: Need 35 separate queries, takes 1+ second
+- **DSQL**: One query, done in 60ms
+
+**🎯 The Bottom Line:**
+- **Predictable performance** = DynamoDB (the devil you know)
+- **Flexible queries** = DSQL (the devil you don't know)
+- **Choose based on** what matters more for your specific use case
 
 ---
 
