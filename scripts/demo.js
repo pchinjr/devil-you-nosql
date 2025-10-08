@@ -160,7 +160,7 @@ class MainDemo {
     }
     console.log('');
 
-    // Scenario 2: Analytics Query
+    // Scenario 2: Analytics Query - Show both implementations
     console.log('📊 SCENARIO: Business analytics (executive dashboard)');
     console.log('   🎯 Goal: Analyze soul power distribution across all locations');
     console.log('   💼 Use case: Executive dashboard showing business metrics\n');
@@ -185,12 +185,87 @@ class MainDemo {
     console.log(`   📈 Analyzed ${analyticsResult.rows.length} locations with aggregations`);
     console.log('   🔧 How: JOIN + GROUP BY + multiple aggregations + calculations');
     console.log('   💡 Features: COUNT, SUM, AVG, conditional aggregation, percentage calc');
-    console.log('   📊 Result: Complete business intelligence in one query');
-    console.log('🔥 DynamoDB: Would require multiple GSI queries + client aggregation');
-    console.log('   🔧 How: Query StatusIndex + LocationIndex + client-side math');
-    console.log('   ⚠️ Complexity: 3-4 separate queries + application logic');
-    console.log('   📊 Estimated time: 60-100ms + development complexity');
-    console.log('   💸 Cost: Multiple read operations vs single DSQL query');
+    console.log('   📊 Result: Complete business intelligence in one query\n');
+
+    // Now show the DynamoDB equivalent implementation
+    console.log('🔥 DynamoDB: Implementing equivalent analytics with multiple operations');
+    const dynamoAnalyticsStart = Date.now();
+    
+    // Step 1: Get all contracts by location using LocationIndex
+    const locations = ['Highway_66', 'Desert_Crossroads', 'Abandoned_Church', 'City_Alley', 'Graveyard', 'Hell_Gate'];
+    const locationData = {};
+    let totalDynamoQueries = 0;
+
+    for (const location of locations) {
+      // Query 1: Get contracts by location
+      const locationContracts = await dynamodb.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        IndexName: 'LocationIndex',
+        KeyConditionExpression: 'contract_location = :location',
+        ExpressionAttributeValues: { ':location': location }
+      }));
+      totalDynamoQueries++;
+
+      if (locationContracts.Items.length > 0) {
+        locationData[location] = {
+          soul_count: 0,
+          redeemed: 0,
+          total_power: 0,
+          contracts: []
+        };
+
+        // Process each contract
+        for (const item of locationContracts.Items) {
+          if (item.SK === 'CONTRACT') {
+            locationData[location].soul_count++;
+            if (item.status === 'Redeemed') {
+              locationData[location].redeemed++;
+            }
+            locationData[location].contracts.push(item.soulId);
+          }
+        }
+
+        // Step 2: Get ledger entries for each soul (additional queries)
+        for (const soulId of locationData[location].contracts) {
+          const ledgerEntries = await dynamodb.send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+            ExpressionAttributeValues: { 
+              ':pk': `SOUL#${soulId}`,
+              ':sk': 'LEDGER#'
+            }
+          }));
+          totalDynamoQueries++;
+
+          // Sum up the power for this soul
+          for (const ledger of ledgerEntries.Items) {
+            locationData[location].total_power += (ledger.amount || 0);
+          }
+        }
+
+        // Calculate derived metrics
+        locationData[location].avg_power_per_soul = locationData[location].soul_count > 0 
+          ? locationData[location].total_power / locationData[location].soul_count 
+          : 0;
+        locationData[location].redemption_rate = locationData[location].soul_count > 0
+          ? (locationData[location].redeemed / locationData[location].soul_count) * 100
+          : 0;
+      }
+    }
+
+    const dynamoAnalyticsTime = Date.now() - dynamoAnalyticsStart;
+
+    // Sort by total power (client-side)
+    const sortedLocations = Object.entries(locationData)
+      .filter(([_, data]) => data.soul_count > 0)
+      .sort(([,a], [,b]) => b.total_power - a.total_power);
+
+    console.log(`   ⚡ Completed in ${dynamoAnalyticsTime}ms using ${totalDynamoQueries} separate queries`);
+    console.log(`   📊 Analyzed ${sortedLocations.length} locations (same result as DSQL)`);
+    console.log('   🔧 How: Multiple GSI queries + client-side aggregation + sorting');
+    console.log('   ⚠️ Complexity: N+M queries (N locations + M souls) + application logic');
+    console.log(`   💸 Cost: ${totalDynamoQueries} read operations vs 1 DSQL query`);
+    console.log(`   📈 Performance ratio: ${(dynamoAnalyticsTime/analyticsTime).toFixed(1)}x slower than DSQL`);
     console.log('');
   }
 
