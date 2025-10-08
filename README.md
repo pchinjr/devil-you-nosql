@@ -31,9 +31,9 @@ This demo illustrates the fundamental difference between:
 - Single query for business intelligence
 
 **📊 Statistical Evidence:**
-- **Performance variability**: DSQL CV=84.4% vs DynamoDB CV=49.6% (both variable in this run)
-- **Analytics performance**: DSQL 26.5x faster than DynamoDB multi-query approach
-- **Batch operations**: DynamoDB 7% faster than DSQL proper SQL (42ms vs 45ms)
+- **Performance variability**: DSQL CV=113.8% vs DynamoDB CV=67.6% (both variable in this run)
+- **Analytics performance**: DSQL 17.4x faster than DynamoDB multi-query approach
+- **Batch operations**: DSQL 6% faster than DynamoDB proper SQL (78ms vs 83ms)
 - **Cold starts**: DSQL can spike to 300ms+ unpredictably in different runs
 
 ---
@@ -200,46 +200,46 @@ All performance numbers in this README are derived from actual test runs of the 
 👹 THE DEVIL YOU NOSQL - STATISTICAL RESULTS
 
 📋 SCENARIO: Complete soul profile (user-facing app)
-🔥 DynamoDB: 49.1ms avg (26.2-85.5ms) - CV=49.6% (Variable consistency)
-   Translation: "Takes about 49ms, usually between 26-86ms. Moderately reliable."
-⚡ DSQL: 50.9ms avg (22.9-165.6ms) - CV=84.4% (High variability)
-   Translation: "Takes about 51ms, but could be 23ms or 166ms. Unpredictable."
-📈 Performance ratio: 1.04x (virtually identical performance)
-✅ Both databases show similar average performance but DSQL more variable
+🔥 DynamoDB: 39.6ms avg (24.7-99.2ms) - CV=67.6% (Variable consistency)
+   Translation: "Takes about 40ms, usually between 25-99ms. Moderately reliable."
+⚡ DSQL: 68.9ms avg (28.0-280.4ms) - CV=113.8% (High variability)
+   Translation: "Takes about 69ms, but could be 28ms or 280ms. Very unpredictable."
+📈 Performance ratio: 1.74x (DSQL slower, not statistically significant)
+🚨 Cold start detected: DSQL spiked to 280ms (7.1x slower than DynamoDB avg)
 
 📊 SCENARIO: Business analytics (executive dashboard)
-⚡ DSQL: 55ms - Single complex query with JOINs and aggregations
-   Translation: "One query does everything in 55ms."
-🔥 DynamoDB: 1,457ms - 35 separate queries + client-side processing
+⚡ DSQL: 81ms - Single complex query with JOINs and aggregations
+   Translation: "One query does everything in 81ms."
+🔥 DynamoDB: 1,412ms - 35 separate queries + client-side processing
    Translation: "Need 35 different queries, takes nearly 1.5 seconds."
-📈 Performance ratio: 26.5x faster with DSQL for analytics
+📈 Performance ratio: 17.4x faster with DSQL for analytics
 
 🔥 SCENARIO: Batch operations (dashboard loading)
-🥇 DynamoDB BatchGet: 42ms (winner - purpose-built API)
-   Translation: "Gets 8 items in 42ms using special batch operation."
-🥈 DSQL IN clause: 45ms (proper SQL batching)
-   Translation: "Gets 8 items in 45ms using SQL ANY() clause."
-🥉 DSQL Parallel: 209ms (suboptimal approach)
-   Translation: "Gets 8 items in 209ms using 8 separate queries."
-🥉 DynamoDB Individual: 372ms (network overhead)
-   Translation: "Gets 8 items in 372ms the slow way (don't do this)."
+🥇 DSQL IN clause: 78ms (winner - proper SQL batching)
+   Translation: "Gets 8 items in 78ms using SQL ANY() clause."
+🥈 DynamoDB BatchGet: 83ms (close second - purpose-built API)
+   Translation: "Gets 8 items in 83ms using special batch operation."
+🥉 DSQL Parallel: 256ms (suboptimal approach)
+   Translation: "Gets 8 items in 256ms using 8 separate queries."
+🥉 DynamoDB Individual: 261ms (network overhead)
+   Translation: "Gets 8 items in 261ms the slow way (don't do this)."
 ```
 
 ### Key Performance Insights
 
 **🎯 Consistency Analysis:**
-- **DynamoDB**: CV=49.6% (variable consistency - moderately reliable)
-- **DSQL**: CV=84.4% (high variability - requires defensive programming)
+- **DynamoDB**: CV=67.6% (variable consistency - moderately reliable)
+- **DSQL**: CV=113.8% (high variability - requires defensive programming)
 
 **📊 Use Case Performance:**
-- **User profiles**: Both perform similarly (49.1ms vs 50.9ms, both variable in this run)
-- **Analytics**: DSQL dominates (55ms vs 1,457ms, 26.5x faster)
-- **Batch operations**: DynamoDB wins (42ms vs 45ms for proper SQL, 209ms for parallel)
+- **User profiles**: DynamoDB faster (39.6ms vs 68.9ms, both variable in this run)
+- **Analytics**: DSQL dominates (81ms vs 1,412ms, 17.4x faster)
+- **Batch operations**: DSQL wins (78ms vs 83ms for proper SQL, 256ms for parallel)
 
 **🚨 Variability Findings:**
 - **This test run**: Both databases showed variable performance
-- **DSQL range**: 22.9-165.6ms (7x variation within single test)
-- **DynamoDB range**: 26.2-85.5ms (3x variation, more predictable)
+- **DSQL range**: 28.0-280.4ms (10x variation within single test)
+- **DynamoDB range**: 24.7-99.2ms (4x variation, more predictable)
 
 **💡 What This Means:**
 - **DynamoDB**: Like a reliable train - arrives on schedule, every time
@@ -265,9 +265,9 @@ Uses a single table `DevilSoulTracker` with composite keys:
 - `LocationIndex`: Query by contract location and status
 
 **Performance Characteristics:**
-- **Entity retrieval**: 49.1ms avg for complete profiles
-- **Batch operations**: 42ms for 8 items (5.3ms per item)
-- **Analytics**: Requires 35+ queries (1,457ms total)
+- **Entity retrieval**: 39.6ms avg for complete profiles
+- **Batch operations**: 83ms for 8 items (10.4ms per item)
+- **Analytics**: Requires 35+ queries (1,412ms total)
 
 ### Aurora DSQL Normalized Schema
 Uses three normalized tables with logical relationships:
@@ -278,9 +278,9 @@ Uses three normalized tables with logical relationships:
 - `soul_ledger` - Financial transactions involving soul power
 
 **Performance Characteristics:**
-- **Entity retrieval**: 50.9ms avg with high variability (CV=84.4%)
-- **Analytics**: 55ms for complex business intelligence
-- **Batch operations**: 45ms for 8 items (proper SQL batching)
+- **Entity retrieval**: 68.9ms avg with high variability (CV=113.8%)
+- **Analytics**: 81ms for complex business intelligence
+- **Batch operations**: 78ms for 8 items (proper SQL batching)
 
 **Note**: Aurora DSQL doesn't support foreign key constraints, so referential integrity is maintained at the application level.
 
@@ -331,10 +331,10 @@ curl -X POST <AuroraApiUrl>/dsql/souls \
 
 | Operation | DynamoDB | Aurora DSQL | Winner |
 |-----------|----------|-------------|---------|
-| User Profiles | 49.1ms (CV=49.6%) | 50.9ms (CV=84.4%) | 🤝 Tie |
-| Analytics | 1,457ms (35 queries) | 55ms (1 query) | ⚡ DSQL |
-| Batch Ops | 42ms (native) | 45ms (proper SQL) | 🔥 DynamoDB |
-| Consistency | Good | Variable* | 🔥 DynamoDB |
+| User Profiles | 39.6ms (CV=67.6%) | 68.9ms (CV=113.8%) | 🔥 DynamoDB |
+| Analytics | 1,412ms (35 queries) | 81ms (1 query) | ⚡ DSQL |
+| Batch Ops | 83ms (native) | 78ms (proper SQL) | ⚡ DSQL |
+| Consistency | Variable | High Variability | 🔥 DynamoDB |
 | Flexibility | Limited | Excellent | ⚡ DSQL |
 
 *Note: DSQL consistency varies between test runs due to cold starts
