@@ -51,6 +51,15 @@ DATASET_SIZE=${2:-"small"}
 case $DEMO_TYPE in
     "quick")
         echo "🚀 Running Quick Demo (validation + basic benchmarks)"
+        run_step "Database Verification" "npm run verify"
+        run_step "Performance Benchmarks" "npm run test:benchmark"
+        ;;
+    "small")
+        echo "🌱 Running Small Demo (perfect for testing)"
+        run_step "Database Verification" "npm run verify"
+        run_step "Create DSQL Tables" "node scripts/createSoulTrackerTables.js"
+        run_step "Small Dataset Seeding" "npm run seed:small"
+        run_step "Create DSQL Indexes" "node scripts/createDsqlIndexes.js"
         run_step "Data Validation" "npm run test:validate"
         run_step "Performance Benchmarks" "npm run test:benchmark"
         ;;
@@ -68,15 +77,18 @@ case $DEMO_TYPE in
             echo "Seeding large dataset (this may take several minutes)..."
             run_step "Large Dataset Seeding" "SOULS_COUNT=1000 EVENTS_PER_SOUL=50 LEDGER_ENTRIES=5000 npm run seed:large"
         else
-            run_step "Small Dataset Seeding (DynamoDB)" "node scripts/seedDynamoSmall.js"
-            run_step "Small Dataset Seeding (DSQL)" "node scripts/seedDsqlSmall.js"
+            run_step "Small Dataset Seeding" "npm run seed:small"
         fi
+        ;;
+    "philosophy")
+        echo "🎭 Running Design Philosophy Demo"
+        run_step "Design Philosophy Demonstration" "npm run demo:philosophy"
         ;;
     "full"|*)
         echo "🎯 Running Full Rigorous Demo"
         
         # Step 1: Verify connectivity and schema
-        run_step "DSQL Connectivity Verification" "node scripts/verifyDsql.js"
+        run_step "Database Verification" "npm run verify"
         run_step "Create DSQL Tables" "node scripts/createSoulTrackerTables.js"
         run_step "Create DSQL Indexes" "node scripts/createDsqlIndexes.js"
         
@@ -92,7 +104,10 @@ case $DEMO_TYPE in
         # Step 3: Run comprehensive tests
         run_step "Complete Test Suite" "npm test"
         
-        # Step 4: Analytics comparison
+        # Step 4: Design Philosophy Demo
+        run_step "Design Philosophy Demonstration" "npm run demo:philosophy"
+        
+        # Step 5: Analytics comparison
         run_step "DynamoDB Analytics" "node scripts/analyticsDynamo.js"
         run_step "DSQL Analytics" "node scripts/analyticsDsql.js"
         ;;
@@ -100,11 +115,12 @@ esac
 
 echo "🎉 Demo completed successfully!"
 echo ""
-echo "Key Findings:"
-echo "• DynamoDB excels at predictable, key-based access patterns"
-echo "• Aurora DSQL shines for complex analytics and ad-hoc queries"
-echo "• Both provide ACID transactions with different trade-offs"
-echo "• Choose based on your specific access patterns and requirements"
+echo "🎭 THE PHILOSOPHICAL DIVIDE:"
+echo "• DynamoDB: Design-time composition - predictable but rigid"
+echo "• Aurora DSQL: Runtime computation - flexible but variable"
+echo "• DynamoDB excels at known, stable access patterns"
+echo "• DSQL shines for analytical and ad-hoc queries"
+echo "• Choose your devil based on your data access philosophy!"
 echo ""
 echo "Next steps:"
 echo "• Review the performance metrics above"

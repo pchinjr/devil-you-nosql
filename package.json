@@ -11,7 +11,11 @@
     "test:benchmark": "node scripts/runTests.js benchmark",
     "test:validate": "node scripts/runTests.js validate",
     "test:load": "node scripts/runTests.js loadtest",
-    "seed:large": "node scripts/seedLarge.js"
+    "seed:small": "node scripts/seedSmall.js",
+    "seed:large": "node scripts/seedLarge.js",
+    "verify": "node scripts/verifyDatabases.js",
+    "demo:philosophy": "node scripts/designPhilosophyDemo.js",
+    "demo:dynamo-strength": "node scripts/dynamoStrengthDemo.js"
   },
   "repository": {
     "type": "git",

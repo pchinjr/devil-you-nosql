@@ -87,6 +87,8 @@ async function createTables(token, endpoint) {
       CREATE TABLE IF NOT EXISTS soul_contracts (
         id VARCHAR PRIMARY KEY,
         contract_status VARCHAR,
+        soul_type VARCHAR,
+        contract_location VARCHAR,
         updated_at TIMESTAMP
       );
     `;

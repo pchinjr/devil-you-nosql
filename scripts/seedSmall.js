@@ -8,14 +8,37 @@ const DSQL_ENDPOINT = process.env.DSQL_ENDPOINT;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const TABLE_NAME = process.env.TABLE_NAME || 'DevilSoulTracker';
 
-// Configurable dataset sizes
-const SOULS_COUNT = parseInt(process.env.SOULS_COUNT) || 1000;
-const EVENTS_PER_SOUL = parseInt(process.env.EVENTS_PER_SOUL) || 50;
-const LEDGER_ENTRIES = parseInt(process.env.LEDGER_ENTRIES) || 5000;
+// Small dataset: 10 souls, 10 events per soul, 50 ledger entries
+const SOULS_COUNT = 10;
+const EVENTS_PER_SOUL = 10;
+const LEDGER_ENTRIES = 50;
 
-class LargeDataSeeder {
+class SmallDataSeeder {
   constructor() {
-    this.dynamoClient = new DynamoDBClient({ hostname: DSQL_ENDPOINT, region: AWS_REGION });
+    this.dynamoClient = new DynamoDBClient({ region: AWS_REGION });
+  }
+
+  generateSoulData() {
+    const souls = [];
+    const statuses = ['Bound', 'Pending_Judgment', 'Redeemed', 'Condemned'];
+    const soulTypes = ['Innocent', 'Sinner', 'Corrupt', 'Evil', 'Murderer', 'Betrayer'];
+    const locations = ['Highway_66', 'Desert_Crossroads', 'Abandoned_Church', 'City_Alley', 'Graveyard', 'Hell_Gate'];
+    
+    for (let i = 1; i <= SOULS_COUNT; i++) {
+      const soulType = soulTypes[Math.floor(Math.random() * soulTypes.length)];
+      const location = locations[Math.floor(Math.random() * locations.length)];
+      const soulId = `${soulType.toLowerCase()}_${location.toLowerCase()}_${i.toString().padStart(3, '0')}`;
+      
+      souls.push({
+        soulId,
+        status: statuses[Math.floor(Math.random() * statuses.length)],
+        soulType,
+        contractLocation: location,
+        createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
+      });
+    }
+    
+    return souls;
   }
 
   async connectDSQL() {
@@ -35,29 +58,6 @@ class LargeDataSeeder {
     });
   }
 
-  generateSoulData() {
-    const souls = [];
-    const statuses = ['Bound', 'Pending_Judgment', 'Redeemed', 'Condemned'];
-    const soulTypes = ['Innocent', 'Sinner', 'Corrupt', 'Evil', 'Murderer', 'Betrayer'];
-    const locations = ['Highway_66', 'Desert_Crossroads', 'Abandoned_Church', 'City_Alley', 'Graveyard', 'Hell_Gate'];
-    
-    for (let i = 1; i <= SOULS_COUNT; i++) {
-      const soulType = soulTypes[Math.floor(Math.random() * soulTypes.length)];
-      const location = locations[Math.floor(Math.random() * locations.length)];
-      const soulId = `${soulType.toLowerCase()}_${location.toLowerCase()}_${i.toString().padStart(4, '0')}`;
-      
-      souls.push({
-        soulId,
-        status: statuses[Math.floor(Math.random() * statuses.length)],
-        soulType,
-        contractLocation: location,
-        createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000)
-      });
-    }
-    
-    return souls;
-  }
-
   async seedDynamoDB() {
     console.log(`Seeding DynamoDB with ${SOULS_COUNT} souls...`);
     
@@ -73,9 +73,9 @@ class LargeDataSeeder {
             SK: { S: 'CONTRACT' },
             soulId: { S: soul.soulId },
             status: { S: soul.status },
-            createdAt: { S: soul.createdAt.toISOString() },
-            GSI1PK: { S: `STATUS#${soul.status}` },
-            GSI1SK: { S: soul.createdAt.toISOString() }
+            soul_type: { S: soul.soulType },
+            contract_location: { S: soul.contractLocation },
+            createdAt: { S: soul.createdAt.toISOString() }
           }
         }
       });
@@ -88,10 +88,8 @@ class LargeDataSeeder {
             Item: {
               PK: { S: `SOUL#${soul.soulId}` },
               SK: { S: `EVENT#${eventTime.toISOString()}` },
-              eventType: { S: j === 1 ? 'Created' : 'StatusChange' },
-              timestamp: { S: eventTime.toISOString() },
-              GSI1PK: { S: `EVENT#${eventTime.toISOString().split('T')[0]}` },
-              GSI1SK: { S: eventTime.toISOString() }
+              eventType: { S: j === 1 ? 'Contract_Created' : 'Status_Change' },
+              timestamp: { S: eventTime.toISOString() }
             }
           }
         });
@@ -111,27 +109,27 @@ class LargeDataSeeder {
             SK: { S: `LEDGER#${timestamp.toISOString()}` },
             amount: { N: amount.toString() },
             timestamp: { S: timestamp.toISOString() },
-            GSI1PK: { S: `LEDGER#${timestamp.toISOString().split('T')[0]}` },
-            GSI1SK: { S: timestamp.toISOString() }
+            description: { S: `Soul power transaction: ${amount}` }
           }
         }
       });
     }
     
-    // Write in batches of 25 (DynamoDB limit)
-    const batchSize = 25;
-    for (let i = 0; i < batches.length; i += batchSize) {
-      const batch = batches.slice(i, i + batchSize);
-      await this.dynamoClient.send(new BatchWriteItemCommand({
-        RequestItems: { [TABLE_NAME]: batch }
-      }));
-      
-      if (i % 250 === 0) {
-        console.log(`  Processed ${i + batch.length}/${batches.length} items`);
-      }
+    // Write in batches of 25
+    const chunks = [];
+    for (let i = 0; i < batches.length; i += 25) {
+      chunks.push(batches.slice(i, i + 25));
     }
     
-    console.log(`✓ DynamoDB seeded with ${batches.length} total items`);
+    for (const chunk of chunks) {
+      await this.dynamoClient.send(new BatchWriteItemCommand({
+        RequestItems: {
+          [TABLE_NAME]: chunk
+        }
+      }));
+    }
+    
+    console.log(`✅ DynamoDB seeded with ${batches.length} items`);
   }
 
   async seedDSQL() {
@@ -147,58 +145,43 @@ class LargeDataSeeder {
       
       // Insert soul contracts
       for (const soul of souls) {
-        await client.query(`
-          INSERT INTO soul_contracts (id, contract_status, soul_type, contract_location, updated_at)
-          VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (id) DO UPDATE SET
-            contract_status = EXCLUDED.contract_status,
-            soul_type = EXCLUDED.soul_type,
-            contract_location = EXCLUDED.contract_location,
-            updated_at = EXCLUDED.updated_at
-        `, [soul.soulId, soul.status, soul.soulType, soul.contractLocation, soul.createdAt]);
-      }
-      
-      // Get contract IDs for events and ledger
-      const contracts = await client.query('SELECT id, updated_at FROM soul_contracts');
-      const contractMap = new Map(contracts.rows.map(c => [c.id, c]));
-      
-      // Insert events
-      let eventCount = 0;
-      for (const soul of souls) {
-        const contract = contractMap.get(soul.soulId);
-        for (let j = 1; j <= EVENTS_PER_SOUL; j++) {
-          const eventTime = new Date(contract.updated_at.getTime() + j * 60000);
-          await client.query(`
-            INSERT INTO soul_contract_events (soul_contract_id, event_time, description)
-            VALUES ($1, $2, $3)
-          `, [contract.id, eventTime, j === 1 ? 'Contract Created' : 'Status Change']);
-          eventCount++;
-        }
+        await client.query(
+          `INSERT INTO soul_contracts (id, contract_status, soul_type, contract_location, updated_at)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (id) DO UPDATE SET
+             contract_status = EXCLUDED.contract_status,
+             soul_type = EXCLUDED.soul_type,
+             contract_location = EXCLUDED.contract_location,
+             updated_at = EXCLUDED.updated_at`,
+          [soul.soulId, soul.status, soul.soulType, soul.contractLocation, soul.createdAt]
+        );
         
-        if (eventCount % 1000 === 0) {
-          console.log(`  Inserted ${eventCount} events`);
+        // Insert events
+        for (let j = 1; j <= EVENTS_PER_SOUL; j++) {
+          const eventTime = new Date(soul.createdAt.getTime() + j * 60000);
+          await client.query(
+            `INSERT INTO soul_contract_events (soul_contract_id, event_time, description)
+             VALUES ($1, $2, $3)`,
+            [soul.soulId, eventTime, j === 1 ? 'Contract Created' : 'Status Change']
+          );
         }
       }
       
       // Insert ledger entries
       for (let i = 1; i <= LEDGER_ENTRIES; i++) {
         const soul = souls[Math.floor(Math.random() * souls.length)];
-        const contract = contractMap.get(soul.soulId);
         const amount = Math.floor(Math.random() * 1000) + 1;
         const timestamp = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000);
         
-        await client.query(`
-          INSERT INTO soul_ledger (soul_contract_id, amount, created_at)
-          VALUES ($1, $2, $3)
-        `, [contract.id, amount, timestamp]);
-        
-        if (i % 500 === 0) {
-          console.log(`  Inserted ${i} ledger entries`);
-        }
+        await client.query(
+          `INSERT INTO soul_ledger (soul_contract_id, amount, transaction_time, description)
+           VALUES ($1, $2, $3, $4)`,
+          [soul.soulId, amount, timestamp, `Soul power transaction: ${amount}`]
+        );
       }
       
       await client.query('COMMIT');
-      console.log(`✓ DSQL seeded with ${SOULS_COUNT} contracts, ${eventCount} events, ${LEDGER_ENTRIES} ledger entries`);
+      console.log(`✅ Aurora DSQL seeded with ${SOULS_COUNT} souls`);
       
     } catch (error) {
       await client.query('ROLLBACK');
@@ -209,8 +192,7 @@ class LargeDataSeeder {
   }
 
   async run() {
-    console.log('=== LARGE DATASET SEEDING ===\n');
-    console.log(`Configuration:`);
+    console.log('🌱 Starting small dataset seeding...');
     console.log(`  Souls: ${SOULS_COUNT}`);
     console.log(`  Events per soul: ${EVENTS_PER_SOUL}`);
     console.log(`  Ledger entries: ${LEDGER_ENTRIES}\n`);
@@ -222,7 +204,7 @@ class LargeDataSeeder {
       await this.seedDSQL();
       
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-      console.log(`\n✅ Large dataset seeding completed in ${duration}s`);
+      console.log(`\n✅ Small dataset seeding completed in ${duration}s`);
       
     } catch (error) {
       console.error('Seeding failed:', error);
@@ -232,7 +214,7 @@ class LargeDataSeeder {
 }
 
 if (require.main === module) {
-  new LargeDataSeeder().run();
+  new SmallDataSeeder().run();
 }
 
-module.exports = LargeDataSeeder;
+module.exports = SmallDataSeeder;

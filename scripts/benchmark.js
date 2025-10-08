@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const { DynamoDBClient, QueryCommand, GetItemCommand } = require('@aws-sdk/client-dynamodb');
-const { DSQLSigner } = require('@aws-sdk/dsql-signer');
+const { DynamoDBClient, QueryCommand, GetItemCommand, BatchGetItemCommand } = require('@aws-sdk/client-dynamodb');
+const { DsqlSigner } = require('@aws-sdk/dsql-signer');
 const { Client } = require('pg');
 
 const DSQL_ENDPOINT = process.env.DSQL_ENDPOINT;
@@ -15,8 +15,11 @@ class BenchmarkSuite {
   }
 
   async connectDSQL() {
-    const signer = new DSQLSigner({ region: AWS_REGION });
-    const token = await signer.getDbConnectAdminAuthToken({ hostname: DSQL_ENDPOINT });
+    const signer = new DsqlSigner({ 
+      hostname: DSQL_ENDPOINT,
+      region: AWS_REGION 
+    });
+    const token = await signer.getDbConnectAdminAuthToken();
     
     return new Client({
       host: DSQL_ENDPOINT,
@@ -74,7 +77,7 @@ class BenchmarkSuite {
     await client.connect();
     
     await this.measureLatency('DSQL Point Lookup', async () => {
-      await client.query('SELECT * FROM soul_contracts WHERE soul_id = $1', ['soul-001']);
+      await client.query('SELECT * FROM soul_contracts WHERE id = $1', ['innocent_highway_66_001']);
     });
     
     await client.end();
@@ -86,12 +89,12 @@ class BenchmarkSuite {
     
     await this.measureLatency('DSQL Join Query', async () => {
       await client.query(`
-        SELECT sc.soul_id, sc.status, COUNT(sce.id) as event_count
+        SELECT sc.id, sc.contract_status, COUNT(sce.id) as event_count
         FROM soul_contracts sc
         LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id
-        WHERE sc.soul_id = $1
-        GROUP BY sc.soul_id, sc.status
-      `, ['soul-001']);
+        WHERE sc.id = $1
+        GROUP BY sc.id, sc.contract_status
+      `, ['innocent_highway_66_001']);
     });
     
     await client.end();
@@ -105,10 +108,10 @@ class BenchmarkSuite {
       await client.query(`
         WITH daily_totals AS (
           SELECT 
-            DATE(created_at) as day,
+            DATE(transaction_time) as day,
             SUM(amount) as daily_total
           FROM soul_ledger 
-          GROUP BY DATE(created_at)
+          GROUP BY DATE(transaction_time)
         )
         SELECT 
           day,
@@ -137,6 +140,23 @@ class BenchmarkSuite {
       console.log(`  Max:    ${stats.max.toFixed(2)}ms`);
       console.log('');
     });
+
+    // Save results to file
+    const fs = require('fs');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `benchmark-results-${timestamp}.json`;
+    
+    const report = {
+      timestamp: new Date().toISOString(),
+      summary: this.results,
+      environment: {
+        dsql_endpoint: process.env.DSQL_ENDPOINT,
+        aws_region: process.env.AWS_REGION || 'us-east-1'
+      }
+    };
+    
+    fs.writeFileSync(filename, JSON.stringify(report, null, 2));
+    console.log(`📄 Results saved to: ${filename}`);
   }
 
   async run() {

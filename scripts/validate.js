@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const { DynamoDBClient, QueryCommand, ScanCommand } = require('@aws-sdk/client-dynamodb');
-const { DSQLSigner } = require('@aws-sdk/dsql-signer');
+const { DsqlSigner } = require('@aws-sdk/dsql-signer');
 const { Client } = require('pg');
 
 const DSQL_ENDPOINT = process.env.DSQL_ENDPOINT;
@@ -15,8 +15,11 @@ class DataValidator {
   }
 
   async connectDSQL() {
-    const signer = new DSQLSigner({ region: AWS_REGION });
-    const token = await signer.getDbConnectAdminAuthToken({ hostname: DSQL_ENDPOINT });
+    const signer = new DsqlSigner({ 
+      hostname: DSQL_ENDPOINT,
+      region: AWS_REGION 
+    });
+    const token = await signer.getDbConnectAdminAuthToken();
     
     return new Client({
       host: DSQL_ENDPOINT,
@@ -67,7 +70,7 @@ class DataValidator {
     
     return result.Items.map(item => ({
       soul_id: item.PK.S.replace('SOUL#', ''),
-      status: item.status?.S || 'Unknown'
+      status: item.status?.S || item.contract_status?.S || 'Unknown'
     }));
   }
 
@@ -75,10 +78,13 @@ class DataValidator {
     const client = await this.connectDSQL();
     await client.connect();
     
-    const result = await client.query('SELECT soul_id, status FROM soul_contracts ORDER BY soul_id');
+    const result = await client.query('SELECT id, contract_status FROM soul_contracts ORDER BY id');
     await client.end();
     
-    return result.rows;
+    return result.rows.map(row => ({
+      soul_id: row.id,
+      status: row.contract_status
+    }));
   }
 
   async validateIndexes() {
@@ -131,7 +137,7 @@ class DataValidator {
     await client.connect();
     
     const dsqlStart = Date.now();
-    await client.query('SELECT * FROM soul_contracts WHERE soul_id = $1', ['soul-001']);
+    await client.query('SELECT * FROM soul_contracts WHERE id = $1', ['innocent_highway_66_001']);
     const dsqlTime = Date.now() - dsqlStart;
     
     await client.end();
