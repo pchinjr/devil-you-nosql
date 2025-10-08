@@ -11,11 +11,15 @@
     "test:benchmark": "node scripts/runTests.js benchmark",
     "test:validate": "node scripts/runTests.js validate",
     "test:load": "node scripts/runTests.js loadtest",
+    "test:rigorous": "node scripts/rigorousBenchmark.js",
     "seed:small": "node scripts/seedSmall.js",
     "seed:large": "node scripts/seedLarge.js",
     "verify": "node scripts/verifyDatabases.js",
     "demo:philosophy": "node scripts/designPhilosophyDemo.js",
-    "demo:dynamo-strength": "node scripts/dynamoStrengthDemo.js"
+    "demo:dynamo-strength": "node scripts/dynamoStrengthDemo.js",
+    "demo:contrast": "node scripts/contrastDemo.js",
+    "test:contrast": "node scripts/rigorousContrastBenchmark.js",
+    "server": "node server.js"
   },
   "repository": {
     "type": "git",
@@ -28,6 +32,7 @@
     "@aws-sdk/dsql-signer": "^3.782.0",
     "@aws-sdk/lib-dynamodb": "^3.257.0",
     "@aws-sdk/util-format-url": "^3.775.0",
+    "express": "^4.21.2",
     "pg": "^8.14.1",
     "uuid": "^9.0.0"
   },

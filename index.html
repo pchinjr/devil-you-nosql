@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devil You NoSQL - Database Comparison Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #ccc;
+            font-size: 1.1rem;
+        }
+
+        .config-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #ffd93d;
+        }
+
+        .input-group input {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .input-group input::placeholder {
+            color: #ccc;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            background: transparent;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .tab.active {
+            background: #ff6b6b;
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(45deg, #ffd93d, #ffed4e);
+            color: #333;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .results h3 {
+            margin-bottom: 15px;
+            color: #ffd93d;
+        }
+
+        .results pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .benchmark-form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #ff6b6b;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected {
+            background: #4ecdc4;
+        }
+
+        .status-disconnected {
+            background: #ff6b6b;
+        }
+
+        @media (max-width: 768px) {
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👹 Devil You NoSQL</h1>
+            <p>Interactive Database Comparison & Benchmarking Tool</p>
+        </div>
+
+        <div class="config-section">
+            <h3>🔧 Configuration</h3>
+            <div class="config-grid">
+                <div class="input-group">
+                    <label for="dynamoEndpoint">
+                        <span class="status-indicator" id="dynamoStatus"></span>
+                        DynamoDB API Endpoint
+                    </label>
+                    <input type="url" id="dynamoEndpoint" placeholder="https://your-api.execute-api.region.amazonaws.com/dynamo">
+                </div>
+                <div class="input-group">
+                    <label for="dsqlEndpoint">
+                        <span class="status-indicator" id="dsqlStatus"></span>
+                        DSQL API Endpoint
+                    </label>
+                    <input type="url" id="dsqlEndpoint" placeholder="https://your-api.execute-api.region.amazonaws.com/dsql">
+                </div>
+            </div>
+            <button class="btn btn-secondary" onclick="testConnections()">Check Configuration</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('operations')">🔥 Operations</button>
+            <button class="tab" onclick="switchTab('benchmarks')">📊 Benchmarks</button>
+            <button class="tab" onclick="switchTab('demos')">🎭 Demos</button>
+        </div>
+
+        <div id="operations" class="tab-content active">
+            <h3>Database Operations</h3>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="getSoulProfile()">Get Soul Profile</button>
+                <button class="btn btn-primary" onclick="updateSoulStatus()">Update Soul Status</button>
+                <button class="btn btn-primary" onclick="queryByStatus()">Query by Status</button>
+                <button class="btn btn-primary" onclick="getAnalytics()">Get Analytics</button>
+            </div>
+            
+            <div class="input-group">
+                <label for="soulId">Soul ID (for operations)</label>
+                <input type="text" id="soulId" placeholder="innocent_highway_66_001" value="innocent_highway_66_001">
+            </div>
+        </div>
+
+        <div id="benchmarks" class="tab-content">
+            <h3>Performance Benchmarks</h3>
+            <div class="benchmark-form">
+                <div class="input-group">
+                    <label for="iterations">Iterations</label>
+                    <input type="number" id="iterations" value="50" min="1" max="1000">
+                </div>
+                <button class="btn btn-warning" onclick="runBenchmark()">Run Benchmark</button>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="btn btn-secondary" onclick="runContrastDemo()">Contrast Demo</button>
+                <button class="btn btn-secondary" onclick="runPhilosophyDemo()">Philosophy Demo</button>
+                <button class="btn btn-secondary" onclick="runRigorousTest()">Rigorous Test</button>
+                <button class="btn btn-primary" onclick="seedData()">Seed Data</button>
+                <button class="btn btn-primary" onclick="verifyDatabases()">Verify DBs</button>
+                <button class="btn btn-warning" onclick="getBenchmarkHistory()">View History</button>
+            </div>
+        </div>
+
+        <div id="demos" class="tab-content">
+            <h3>Interactive Demos</h3>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="demoUserFacing()">User-Facing Lookup</button>
+                <button class="btn btn-primary" onclick="demoBatchOps()">Batch Operations</button>
+                <button class="btn btn-secondary" onclick="demoAnalytics()">Ad-Hoc Analytics</button>
+                <button class="btn btn-secondary" onclick="demoComplexQuery()">Complex Queries</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <h3>Results</h3>
+            <pre id="resultsContent"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let dynamoEndpoint = '';
+        let dsqlEndpoint = '';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfigFromServer();
+            updateStatusIndicators();
+        });
+
+        // Configuration management
+        async function loadConfigFromServer() {
+            try {
+                const response = await fetch('http://localhost:3000/api/config');
+                const config = await response.json();
+                
+                // Use server config if available, otherwise use localStorage
+                dynamoEndpoint = config.dsqlEndpoint ? `https://your-api.execute-api.${config.awsRegion}.amazonaws.com/dynamo` : localStorage.getItem('dynamoEndpoint') || '';
+                dsqlEndpoint = config.dsqlEndpoint ? `https://your-api.execute-api.${config.awsRegion}.amazonaws.com/dsql` : localStorage.getItem('dsqlEndpoint') || '';
+                
+                document.getElementById('dynamoEndpoint').value = dynamoEndpoint;
+                document.getElementById('dsqlEndpoint').value = dsqlEndpoint;
+                
+                // Show actual DSQL endpoint if available
+                if (config.dsqlEndpoint) {
+                    document.getElementById('dsqlEndpoint').placeholder = `DSQL: ${config.dsqlEndpoint}`;
+                }
+                
+                updateStatusIndicators();
+            } catch (error) {
+                console.log('Server config not available, using localStorage');
+                loadConfig();
+            }
+        }
+
+        function loadConfig() {
+            dynamoEndpoint = localStorage.getItem('dynamoEndpoint') || '';
+            dsqlEndpoint = localStorage.getItem('dsqlEndpoint') || '';
+            
+            document.getElementById('dynamoEndpoint').value = dynamoEndpoint;
+            document.getElementById('dsqlEndpoint').value = dsqlEndpoint;
+        }
+
+        function saveConfig() {
+            dynamoEndpoint = document.getElementById('dynamoEndpoint').value;
+            dsqlEndpoint = document.getElementById('dsqlEndpoint').value;
+            
+            localStorage.setItem('dynamoEndpoint', dynamoEndpoint);
+            localStorage.setItem('dsqlEndpoint', dsqlEndpoint);
+        }
+
+        // Tab management
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Utility functions
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('results').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        function showResults(content) {
+            document.getElementById('resultsContent').textContent = JSON.stringify(content, null, 2);
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function updateStatusIndicators() {
+            const dynamoStatus = document.getElementById('dynamoStatus');
+            const dsqlStatus = document.getElementById('dsqlStatus');
+            
+            // Check if we have server config or user input
+            const hasDynamo = dynamoEndpoint || document.getElementById('dynamoEndpoint').value;
+            const hasDsql = dsqlEndpoint || document.getElementById('dsqlEndpoint').value;
+            
+            dynamoStatus.className = `status-indicator ${hasDynamo ? 'status-connected' : 'status-disconnected'}`;
+            dsqlStatus.className = `status-indicator ${hasDsql ? 'status-connected' : 'status-disconnected'}`;
+        }
+
+        // Connection testing - now just validates config
+        async function testConnections() {
+            saveConfig();
+            showLoading();
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/config');
+                const config = await response.json();
+                
+                const results = {
+                    serverConfig: config,
+                    userConfig: {
+                        dynamoEndpoint: dynamoEndpoint,
+                        dsqlEndpoint: dsqlEndpoint
+                    },
+                    status: 'Configuration loaded successfully',
+                    timestamp: new Date().toISOString()
+                };
+                
+                hideLoading();
+                showResults(results);
+                updateStatusIndicators();
+            } catch (error) {
+                hideLoading();
+                showResults({
+                    error: 'Failed to connect to local server. Make sure to run: npm run server',
+                    details: error.message
+                });
+            }
+        }
+
+        // Database operations
+        async function getSoulProfile() {
+            const soulId = document.getElementById('soulId').value;
+            if (!soulId) {
+                alert('Please enter a Soul ID');
+                return;
+            }
+
+            saveConfig();
+            showLoading();
+
+            const results = {
+                operation: 'getSoulProfile',
+                soulId,
+                dynamo: null,
+                dsql: null,
+                performance: {}
+            };
+
+            try {
+                if (dynamoEndpoint) {
+                    const start = performance.now();
+                    results.dynamo = await makeRequest(dynamoEndpoint, `/souls/${soulId}`);
+                    results.performance.dynamo = `${(performance.now() - start).toFixed(1)}ms`;
+                }
+            } catch (error) {
+                results.dynamo = { error: error.message };
+            }
+
+            try {
+                if (dsqlEndpoint) {
+                    const start = performance.now();
+                    results.dsql = await makeRequest(dsqlEndpoint, `/souls/${soulId}`);
+                    results.performance.dsql = `${(performance.now() - start).toFixed(1)}ms`;
+                }
+            } catch (error) {
+                results.dsql = { error: error.message };
+            }
+
+            hideLoading();
+            showResults(results);
+        }
+
+        async function updateSoulStatus() {
+            const soulId = document.getElementById('soulId').value;
+            if (!soulId) {
+                alert('Please enter a Soul ID');
+                return;
+            }
+
+            const newStatus = prompt('Enter new status (Bound, Condemned, Redeemed):');
+            if (!newStatus) return;
+
+            const amount = parseInt(prompt('Enter amount:') || '100');
+
+            saveConfig();
+            showLoading();
+
+            const results = {
+                operation: 'updateSoulStatus',
+                soulId,
+                newStatus,
+                amount,
+                dynamo: null,
+                dsql: null
+            };
+
+            try {
+                if (dynamoEndpoint) {
+                    results.dynamo = await makeRequest(dynamoEndpoint, '/souls', 'POST', {
+                        soulId,
+                        newStatus,
+                        amount
+                    });
+                }
+            } catch (error) {
+                results.dynamo = { error: error.message };
+            }
+
+            try {
+                if (dsqlEndpoint) {
+                    results.dsql = await makeRequest(dsqlEndpoint, '/souls', 'POST', {
+                        soulContractId: soulId,
+                        newStatus,
+                        amount
+                    });
+                }
+            } catch (error) {
+                results.dsql = { error: error.message };
+            }
+
+            hideLoading();
+            showResults(results);
+        }
+
+        async function queryByStatus() {
+            const status = prompt('Enter status to query (Bound, Condemned, Redeemed):') || 'Bound';
+            
+            saveConfig();
+            showLoading();
+
+            const results = {
+                operation: 'queryByStatus',
+                status,
+                dynamo: null,
+                dsql: null,
+                performance: {}
+            };
+
+            try {
+                if (dynamoEndpoint) {
+                    const start = performance.now();
+                    results.dynamo = await makeRequest(dynamoEndpoint, `/souls/status/${status}`);
+                    results.performance.dynamo = `${(performance.now() - start).toFixed(1)}ms`;
+                }
+            } catch (error) {
+                results.dynamo = { error: error.message };
+            }
+
+            try {
+                if (dsqlEndpoint) {
+                    const start = performance.now();
+                    results.dsql = await makeRequest(dsqlEndpoint, `/souls/status/${status}`);
+                    results.performance.dsql = `${(performance.now() - start).toFixed(1)}ms`;
+                }
+            } catch (error) {
+                results.dsql = { error: error.message };
+            }
+
+            hideLoading();
+            showResults(results);
+        }
+
+        async function getAnalytics() {
+            saveConfig();
+            showLoading();
+
+            const results = {
+                operation: 'getAnalytics',
+                dynamo: null,
+                dsql: null,
+                performance: {}
+            };
+
+            try {
+                if (dynamoEndpoint) {
+                    const start = performance.now();
+                    results.dynamo = await makeRequest(dynamoEndpoint, '/analytics');
+                    results.performance.dynamo = `${(performance.now() - start).toFixed(1)}ms`;
+                }
+            } catch (error) {
+                results.dynamo = { error: error.message };
+            }
+
+            try {
+                if (dsqlEndpoint) {
+                    const start = performance.now();
+                    results.dsql = await makeRequest(dsqlEndpoint, '/analytics');
+                    results.performance.dsql = `${(performance.now() - start).toFixed(1)}ms`;
+                }
+            } catch (error) {
+                results.dsql = { error: error.message };
+            }
+
+            hideLoading();
+            showResults(results);
+        }
+
+        // Execute local Node.js scripts
+        async function executeScript(scriptName, args = []) {
+            showLoading();
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/run-script', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        script: scriptName,
+                        args: args
+                    })
+                });
+
+                const result = await response.json();
+                hideLoading();
+                
+                if (result.success) {
+                    showResults({
+                        script: scriptName,
+                        duration: `${result.duration}ms`,
+                        output: result.stdout,
+                        timestamp: result.timestamp
+                    });
+                } else {
+                    showResults({
+                        script: scriptName,
+                        error: result.error,
+                        stderr: result.stderr
+                    });
+                }
+            } catch (error) {
+                hideLoading();
+                showResults({
+                    error: 'Failed to connect to local server. Make sure to run: node server.js',
+                    details: error.message
+                });
+            }
+        }
+
+        // Benchmark functions
+        async function runBenchmark() {
+            const iterations = document.getElementById('iterations').value;
+            await executeScript('rigorousContrastBenchmark.js', [iterations]);
+        }
+
+        // Demo functions - now using real scripts
+        async function runContrastDemo() {
+            await executeScript('contrastDemo.js');
+        }
+
+        async function runPhilosophyDemo() {
+            await executeScript('designPhilosophyDemo.js');
+        }
+
+        async function runRigorousTest() {
+            const iterations = document.getElementById('iterations').value || '50';
+            await executeScript('rigorousBenchmark.js', [iterations]);
+        }
+
+        async function demoUserFacing() {
+            await executeScript('contrastDemo.js');
+        }
+
+        async function demoBatchOps() {
+            await executeScript('dynamoStrengthDemo.js');
+        }
+
+        async function demoAnalytics() {
+            await executeScript('contrastDemo.js');
+        }
+
+        async function demoComplexQuery() {
+            await executeScript('rigorousContrastBenchmark.js', ['10']);
+        }
+
+        // Database operations - simplified for demo
+        async function getSoulProfile() {
+            showResults({
+                info: 'This would call your Lambda endpoints',
+                suggestion: 'Use the benchmark scripts to see real database performance',
+                tip: 'Try "Run Contrast Demo" to see actual database interactions'
+            });
+        }
+
+        async function updateSoulStatus() {
+            showResults({
+                info: 'This would call your Lambda endpoints',
+                suggestion: 'Deploy your SAM template first, then update the endpoints above'
+            });
+        }
+
+        async function queryByStatus() {
+            showResults({
+                info: 'This would call your Lambda endpoints',
+                suggestion: 'Use the benchmark scripts to see real query performance'
+            });
+        }
+
+        async function getAnalytics() {
+            await executeScript('contrastDemo.js');
+        }
+
+        // Add utility functions
+        async function seedData() {
+            await executeScript('seedSmall.js');
+        }
+
+        async function verifyDatabases() {
+            await executeScript('verifyDatabases.js');
+        }
+
+        async function getBenchmarkHistory() {
+            try {
+                const response = await fetch('http://localhost:3000/api/benchmark-results');
+                const results = await response.json();
+                showResults({
+                    benchmarkHistory: results,
+                    tip: 'Click on a filename to see full results'
+                });
+            } catch (error) {
+                showResults({
+                    error: 'Failed to get benchmark history',
+                    details: error.message
+                });
+            }
+        }
+    </script>
+</body>
+</html>
