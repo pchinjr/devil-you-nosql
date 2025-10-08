@@ -5,7 +5,7 @@
  */
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, GetCommand, QueryCommand, BatchGetCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, QueryCommand, BatchGetCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
 const { DsqlSigner } = require("@aws-sdk/dsql-signer");
 const { Client } = require("pg");
 
@@ -81,12 +81,13 @@ class MainDemo {
   async demoPhilosophy() {
     console.log('🎭 DESIGN PHILOSOPHY DEMONSTRATION');
     console.log('==================================');
-    console.log('📖 All operations are READ-ONLY queries demonstrating:');
-    console.log('   • User profile retrieval (mobile app scenario)');
-    console.log('   • Business analytics (executive dashboard)');
-    console.log('   • Batch operations (admin panel loading)');
-    console.log('   • Complex analytics (risk analysis)');
-    console.log('🎯 Focus: Query performance, not write throughput\n');
+    console.log('📖 Testing both READ and WRITE operations:');
+    console.log('   • User profile retrieval (READ - mobile app scenario)');
+    console.log('   • Business analytics (READ - executive dashboard)');
+    console.log('   • Batch operations (READ - admin panel loading)');
+    console.log('   • Soul contract updates (WRITE - transaction scenarios)');
+    console.log('   • Complex analytics (READ - risk analysis)');
+    console.log('🎯 Focus: Complete CRUD performance comparison\n');
 
     const soulId = await this.getSampleSoulId();
 
@@ -300,6 +301,137 @@ class MainDemo {
     sortedLocations.slice(0, 3).forEach(([location, data], i) => {
       console.log(`   Location ${i + 1}: ${location} - ${data.soul_count} souls, ${data.redeemed} redeemed (${data.redemption_rate.toFixed(1)}%), Power: ${data.total_power}`);
     });
+    console.log('');
+
+    // Write Operations Demonstration
+    await this.demonstrateWriteOperations();
+  }
+
+  async demonstrateWriteOperations() {
+    console.log('✍️  WRITE OPERATIONS DEMONSTRATION');
+    console.log('==================================');
+    console.log('🎯 Testing transaction performance with direct database calls\n');
+
+    console.log('📝 SCENARIO: Soul contract status update (transaction scenario)');
+    console.log('   🎯 Goal: Update contract status + add event + update ledger');
+    console.log('   💼 Use case: Ghost Rider completing a soul redemption\n');
+
+    const soulId = 'murderer_highway_66_009';
+    const newStatus = 'Redeemed';
+    const amount = 500;
+    const eventDescription = 'Soul redeemed by Ghost Rider';
+
+    // Test DynamoDB transaction
+    console.log('🔥 DynamoDB Transaction:');
+    const dynamoWriteStart = Date.now();
+    try {
+      await dynamodb.send(new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: TABLE_NAME,
+              Key: { PK: `SOUL#${soulId}`, SK: 'CONTRACT' },
+              UpdateExpression: 'SET #status = :status, updated_at = :timestamp',
+              ExpressionAttributeNames: { '#status': 'status' },
+              ExpressionAttributeValues: { 
+                ':status': newStatus,
+                ':timestamp': new Date().toISOString()
+              }
+            }
+          },
+          {
+            Put: {
+              TableName: TABLE_NAME,
+              Item: {
+                PK: `SOUL#${soulId}`,
+                SK: `EVENT#${new Date().toISOString()}`,
+                description: eventDescription,
+                timestamp: new Date().toISOString()
+              }
+            }
+          },
+          {
+            Put: {
+              TableName: TABLE_NAME,
+              Item: {
+                PK: `SOUL#${soulId}`,
+                SK: `LEDGER#${new Date().toISOString()}`,
+                amount: amount,
+                transaction_type: 'redemption',
+                timestamp: new Date().toISOString()
+              }
+            }
+          }
+        ]
+      }));
+      
+      const dynamoWriteTime = Date.now() - dynamoWriteStart;
+      console.log(`   ✅ Transaction completed in ${dynamoWriteTime}ms`);
+      console.log(`   🔧 How: TransactWrite with 3 operations (1 update + 2 inserts)`);
+      console.log(`   📊 Operations: Contract status updated, event logged, ledger entry added`);
+      console.log(`   💡 ACID: Strong consistency within partition`);
+    } catch (error) {
+      console.log(`   ❌ DynamoDB transaction failed: ${error.message}`);
+    }
+
+    // Test DSQL transaction
+    console.log('\n⚡ DSQL Transaction:');
+    const dsqlWriteStart = Date.now();
+    try {
+      await this.dsqlClient.query('BEGIN');
+      
+      // Update contract status
+      await this.dsqlClient.query(
+        'UPDATE soul_contracts SET contract_status = $1, updated_at = $2 WHERE id = $3',
+        [newStatus, new Date().toISOString(), soulId]
+      );
+      
+      // Add event
+      await this.dsqlClient.query(
+        'INSERT INTO soul_contract_events (soul_contract_id, description, timestamp) VALUES ($1, $2, $3)',
+        [soulId, eventDescription, new Date().toISOString()]
+      );
+      
+      // Add ledger entry
+      await this.dsqlClient.query(
+        'INSERT INTO soul_ledger (soul_contract_id, amount, transaction_type, timestamp) VALUES ($1, $2, $3, $4)',
+        [soulId, amount, 'redemption', new Date().toISOString()]
+      );
+      
+      await this.dsqlClient.query('COMMIT');
+      
+      const dsqlWriteTime = Date.now() - dsqlWriteStart;
+      console.log(`   ✅ Transaction completed in ${dsqlWriteTime}ms`);
+      console.log(`   🔧 How: SQL transaction with BEGIN/COMMIT across 3 tables`);
+      console.log(`   📊 Operations: Contract updated, event inserted, ledger entry inserted`);
+      console.log(`   💡 ACID: Full transaction isolation across tables`);
+    } catch (error) {
+      console.log(`   ❌ DSQL transaction failed: ${error.message}`);
+      try {
+        await this.dsqlClient.query('ROLLBACK');
+        console.log('   🔄 Transaction rolled back successfully');
+      } catch (rollbackError) {
+        console.log('   ⚠️ Rollback also failed');
+      }
+    }
+
+    console.log('\n🎯 WRITE OPERATIONS ANALYSIS:');
+    console.log('🔥 DynamoDB Transactions:');
+    console.log('   ✅ Predictable latency (typically 20-50ms)');
+    console.log('   ✅ Strong consistency within partition');
+    console.log('   ✅ Atomic operations up to 100 items');
+    console.log('   ⚠️ Limited to single partition for transactions');
+    
+    console.log('⚡ DSQL Transactions:');
+    console.log('   ✅ Full ACID compliance across tables');
+    console.log('   ✅ Complex transaction logic with SQL');
+    console.log('   ✅ Automatic rollback on failure');
+    console.log('   ⚠️ Variable latency (20-200ms+ depending on complexity)');
+    
+    console.log('\n💡 WRITE OPERATIONS INSIGHTS:');
+    console.log('   🔥 DynamoDB: Optimized for high-throughput writes with predictable performance');
+    console.log('   ⚡ DSQL: Flexible transactions with full SQL capabilities but variable latency');
+    console.log('   🎯 Choose based on: Throughput requirements vs transaction complexity');
     console.log('');
   }
 
