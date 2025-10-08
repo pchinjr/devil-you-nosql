@@ -315,27 +315,44 @@ class MainDemo {
     console.log(`   💸 Network overhead: ${keys.length} round-trips vs 1 batch call`);
     console.log(`   📈 Efficiency gain: ${(individualTime/batchTime).toFixed(1)}x faster with batching\n`);
 
-    // Compare with DSQL equivalent
-    console.log('   📊 COMPARISON: DSQL equivalent (parallel individual queries)');
-    const dsqlStart = Date.now();
+    // Compare with DSQL equivalent - show both approaches
+    console.log('   📊 COMPARISON: DSQL batching approaches');
+    
+    // Approach 1: SQL IN clause (proper SQL batching)
+    const dsqlInStart = Date.now();
+    const dsqlInResult = await this.dsqlClient.query(
+      'SELECT * FROM soul_contracts WHERE id = ANY($1::text[])', 
+      [soulIds]
+    );
+    const dsqlInTime = Date.now() - dsqlInStart;
+
+    console.log(`   ⚡ DSQL IN clause: ${dsqlInTime}ms for ${keys.length} contracts`);
+    console.log(`   🔧 How: Single query with ANY($1::text[]) - proper SQL batching`);
+    console.log(`   📊 Per-item cost: ${(dsqlInTime/keys.length).toFixed(1)}ms per contract`);
+    console.log(`   💡 Native SQL set operation - database optimized\n`);
+
+    // Approach 2: Parallel individual queries (what we tested before)
+    console.log('   📊 COMPARISON: DSQL parallel queries (suboptimal approach)');
+    const dsqlParallelStart = Date.now();
     const dsqlPromises = soulIds.map(id => 
       this.dsqlClient.query('SELECT * FROM soul_contracts WHERE id = $1', [id])
     );
     await Promise.all(dsqlPromises);
-    const dsqlTime = Date.now() - dsqlStart;
+    const dsqlParallelTime = Date.now() - dsqlParallelStart;
 
-    console.log(`   ⚡ DSQL parallel queries: ${dsqlTime}ms for ${keys.length} contracts`);
+    console.log(`   ⚠️  DSQL parallel queries: ${dsqlParallelTime}ms for ${keys.length} contracts`);
     console.log(`   🔧 How: ${keys.length} parallel SELECT statements`);
-    console.log(`   📊 Per-item cost: ${(dsqlTime/keys.length).toFixed(1)}ms per contract`);
-    console.log(`   💡 No native batch operation - must use parallel queries\n`);
+    console.log(`   📊 Per-item cost: ${(dsqlParallelTime/keys.length).toFixed(1)}ms per contract`);
+    console.log(`   💡 Suboptimal - forces multiple connections and queries\n`);
 
     console.log('   🎯 BATCH OPERATIONS ANALYSIS:');
-    console.log(`   🥇 DynamoDB BatchGet: ${batchTime}ms (winner - purpose-built for batching)`);
-    console.log(`   🥈 DynamoDB Individual: ${individualTime}ms (${(individualTime/batchTime).toFixed(1)}x slower)`);
-    console.log(`   🥉 DSQL Parallel: ${dsqlTime}ms (${(dsqlTime/batchTime).toFixed(1)}x slower)`);
-    console.log('   💡 Key insight: DynamoDB\'s batch operations are a major architectural advantage');
-    console.log('   🔧 Use case: Perfect for loading lists, dashboards, bulk operations');
-    console.log('   📊 Scalability: Performance stays consistent up to 100 items per batch');
+    console.log(`   🥇 DynamoDB BatchGet: ${batchTime}ms (winner - purpose-built API)`);
+    console.log(`   🥈 DSQL IN clause: ${dsqlInTime}ms (${(dsqlInTime/batchTime).toFixed(1)}x slower - proper SQL)`);
+    console.log(`   🥉 DynamoDB Individual: ${individualTime}ms (${(individualTime/batchTime).toFixed(1)}x slower - network overhead)`);
+    console.log(`   🥉 DSQL Parallel: ${dsqlParallelTime}ms (${(dsqlParallelTime/batchTime).toFixed(1)}x slower - suboptimal)`);
+    console.log('   💡 Key insight: SQL IN clause is the proper way to batch in SQL databases');
+    console.log('   🔧 Use case: DynamoDB wins for purpose-built APIs, SQL wins with proper syntax');
+    console.log('   📊 Scalability: Both approaches scale well with proper implementation');
     console.log('');
 
     // DSQL Strength: Complex Queries with statistical analysis
