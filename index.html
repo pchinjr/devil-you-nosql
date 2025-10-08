@@ -146,6 +146,41 @@
             color: white;
         }
 
+        .btn-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            transform: translateY(-2px);
+        }
+
+        .demo-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid #4ecdc4;
+        }
+
+        .demo-info h4 {
+            margin-top: 0;
+            color: #4ecdc4;
+            font-size: 16px;
+        }
+
+        .demo-info ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .demo-info li {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
         .btn-warning {
             background: linear-gradient(45deg, #ffd93d, #ffed4e);
             color: #333;
@@ -282,35 +317,37 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('operations')">🔥 Operations</button>
-            <button class="tab" onclick="switchTab('benchmarks')">📊 Benchmarks</button>
+            <button class="tab active" onclick="switchTab('operations')">🔧 Operations</button>
             <button class="tab" onclick="switchTab('demos')">🎭 Demos</button>
         </div>
 
         <div id="operations" class="tab-content active">
-            <h3>Database Operations</h3>
+            <h3>🔧 Database Operations</h3>
+            <p>Setup, verify, and manage your databases</p>
             <div class="action-buttons">
-                <button class="btn btn-primary" onclick="runSetup()">Complete Setup</button>
-                <button class="btn btn-primary" onclick="runDemo()">Main Demo</button>
-                <button class="btn btn-warning" onclick="verifyDatabases()">Verify DBs</button>
-            </div>
-        </div>
-
-        <div id="benchmarks" class="tab-content">
-            <h3>Performance & Data</h3>
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="seedData()">Seed Data</button>
-                <button class="btn btn-secondary" onclick="validateData()">Validate Data</button>
-                <button class="btn btn-primary" onclick="runDemo()">Performance Demo</button>
+                <button class="btn btn-primary" onclick="runSetup()">🚀 Complete Setup</button>
+                <button class="btn btn-warning" onclick="verifyDatabases()">🔍 Verify Databases</button>
+                <button class="btn btn-secondary" onclick="seedData()">🌱 Seed Data</button>
+                <button class="btn btn-secondary" onclick="validateData()">✅ Validate Data</button>
             </div>
         </div>
 
         <div id="demos" class="tab-content">
-            <h3>Quick Actions</h3>
+            <h3>🎭 Philosophy Demonstrations</h3>
+            <p>Experience the core differences between "The Devil You Know" vs "The Devil You Don't"</p>
             <div class="action-buttons">
-                <button class="btn btn-primary" onclick="runSetup()">🚀 Complete Setup</button>
-                <button class="btn btn-primary" onclick="runDemo()">🎭 Main Demo</button>
-                <button class="btn btn-warning" onclick="seedData()">🌱 Seed Data</button>
+                <button class="btn btn-primary" onclick="runDemo()">👹 Main Demo</button>
+                <button class="btn btn-info" onclick="runDemo()">📊 Performance Analysis</button>
+                <button class="btn btn-info" onclick="runDemo()">🎯 Variability Testing</button>
+            </div>
+            <div class="demo-info">
+                <h4>What the Demo Shows:</h4>
+                <ul>
+                    <li><strong>🔥 DynamoDB:</strong> Predictable performance (25-35ms), single-table design advantages</li>
+                    <li><strong>⚡ DSQL:</strong> Variable performance (30-300ms), SQL flexibility benefits</li>
+                    <li><strong>📈 Real scenarios:</strong> User profiles, business analytics, batch operations</li>
+                    <li><strong>🎯 Decision guidance:</strong> When to choose each database</li>
+                </ul>
             </div>
         </div>
 
