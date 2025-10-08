@@ -122,11 +122,41 @@ npm run server
 ### Setup Script Creates:
 - ✅ **DSQL Tables** (`soul_contracts`, `soul_contract_events`, `soul_ledger`)
 - ✅ **DSQL Indexes** (optional, for optimal performance)
-- ✅ **Sample Data** in both databases
+- ✅ **Small Sample Data** (10 souls, 100 events, 50 ledger entries)
 - ✅ **Validation** of complete setup
+
+### Data Seeding Options:
+**Small Dataset (included in setup):**
+- **10 soul contracts** - Quick setup verification
+- **100 contract events** (10 per soul)
+- **50 ledger entries** - Power transactions
+- **Purpose**: Verify everything works, fast demos
+
+**Large Dataset (optional):**
+```bash
+npm run seed-large  # Creates 1,000+ souls for stress testing
+```
+- **1,000 soul contracts** - Performance testing
+- **50,000 contract events** (50 per soul)
+- **5,000 ledger entries** - Comprehensive data
+- **Purpose**: Stress testing, realistic performance analysis
 
 ### Why Setup is Required:
 **SAM Limitation**: CloudFormation cannot create DSQL tables/indexes yet, only the cluster. The setup script handles the database schema creation that SAM cannot do.
+
+### Data Seeding Strategy:
+**Setup runs small dataset first** to verify everything works:
+- **Fast verification** (10 souls, 100 events, 50 ledger entries)
+- **Both databases populated** with identical data
+- **Ready for immediate demos**
+
+**Optional large dataset** for stress testing:
+```bash
+npm run seed-large  # Run after setup for performance testing
+```
+- **1,000 souls, 50,000 events, 5,000 ledger entries**
+- **Realistic data volumes** for performance analysis
+- **Takes longer but provides comprehensive testing**
 
 ### After Stack Deletion/Redeployment:
 If you delete and redeploy the SAM stack, you must run `npm run setup` again because:
