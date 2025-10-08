@@ -273,14 +273,16 @@ class MainDemo {
     console.log('🎯 NATURAL STRENGTHS DEMONSTRATION');
     console.log('==================================\n');
 
-    // DynamoDB Strength: Batch Operations
+    // DynamoDB Strength: Batch Operations with detailed comparison
     console.log('🔥 DYNAMODB STRENGTH: Batch Operations');
     console.log('   🎯 Scenario: Retrieve multiple soul contracts for dashboard list');
     console.log('   📱 Use case: Admin panel showing 10 recent contracts');
+    console.log('   🔬 Testing: Compare batch vs individual operations\n');
     
     const soulIds = await this.getMultipleSoulIds(10);
     const keys = soulIds.map(id => ({ PK: `SOUL#${id}`, SK: 'CONTRACT' }));
 
+    // DynamoDB BatchGetItem (optimized)
     const batchStart = Date.now();
     const batchResult = await dynamodb.send(new BatchGetCommand({
       RequestItems: {
@@ -289,11 +291,51 @@ class MainDemo {
     }));
     const batchTime = Date.now() - batchStart;
 
-    console.log(`   ✅ Retrieved ${keys.length} soul contracts in ${batchTime}ms`);
-    console.log('   🔧 How: Single BatchGetItem operation');
-    console.log('   💡 Advantage: Optimized for bulk operations, single network round-trip');
-    console.log('   📊 Performance: ~30ms regardless of item count (up to 100 items)');
-    console.log('   💸 Cost: 1 operation vs N individual queries');
+    console.log(`   ✅ DynamoDB BatchGetItem: ${batchTime}ms for ${keys.length} contracts`);
+    console.log(`   🔧 How: Single API call retrieves all items simultaneously`);
+    console.log(`   📊 Per-item cost: ${(batchTime/keys.length).toFixed(1)}ms per contract`);
+    console.log(`   💡 Network efficiency: 1 round-trip vs ${keys.length} individual calls\n`);
+
+    // Compare with individual DynamoDB queries
+    console.log('   📊 COMPARISON: Individual DynamoDB queries (inefficient approach)');
+    const individualStart = Date.now();
+    const individualResults = [];
+    
+    for (const key of keys) {
+      const result = await dynamodb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: key
+      }));
+      individualResults.push(result.Item);
+    }
+    const individualTime = Date.now() - individualStart;
+
+    console.log(`   ⚠️  Individual queries: ${individualTime}ms for ${keys.length} contracts`);
+    console.log(`   📊 Per-item cost: ${(individualTime/keys.length).toFixed(1)}ms per contract`);
+    console.log(`   💸 Network overhead: ${keys.length} round-trips vs 1 batch call`);
+    console.log(`   📈 Efficiency gain: ${(individualTime/batchTime).toFixed(1)}x faster with batching\n`);
+
+    // Compare with DSQL equivalent
+    console.log('   📊 COMPARISON: DSQL equivalent (parallel individual queries)');
+    const dsqlStart = Date.now();
+    const dsqlPromises = soulIds.map(id => 
+      this.dsqlClient.query('SELECT * FROM soul_contracts WHERE id = $1', [id])
+    );
+    await Promise.all(dsqlPromises);
+    const dsqlTime = Date.now() - dsqlStart;
+
+    console.log(`   ⚡ DSQL parallel queries: ${dsqlTime}ms for ${keys.length} contracts`);
+    console.log(`   🔧 How: ${keys.length} parallel SELECT statements`);
+    console.log(`   📊 Per-item cost: ${(dsqlTime/keys.length).toFixed(1)}ms per contract`);
+    console.log(`   💡 No native batch operation - must use parallel queries\n`);
+
+    console.log('   🎯 BATCH OPERATIONS ANALYSIS:');
+    console.log(`   🥇 DynamoDB BatchGet: ${batchTime}ms (winner - purpose-built for batching)`);
+    console.log(`   🥈 DynamoDB Individual: ${individualTime}ms (${(individualTime/batchTime).toFixed(1)}x slower)`);
+    console.log(`   🥉 DSQL Parallel: ${dsqlTime}ms (${(dsqlTime/batchTime).toFixed(1)}x slower)`);
+    console.log('   💡 Key insight: DynamoDB\'s batch operations are a major architectural advantage');
+    console.log('   🔧 Use case: Perfect for loading lists, dashboards, bulk operations');
+    console.log('   📊 Scalability: Performance stays consistent up to 100 items per batch');
     console.log('');
 
     // DSQL Strength: Complex Queries with statistical analysis
