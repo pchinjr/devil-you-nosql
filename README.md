@@ -79,35 +79,59 @@ devil-you-nosql/
 
 ## 🚀 Quick Start
 
-### 1. Set Environment Variables
+### 1. Deploy Infrastructure with SAM
 ```bash
-export DSQL_ENDPOINT=your-cluster-endpoint.dsql.us-east-1.on.aws
-export AWS_REGION=us-east-1
+# Deploy the complete stack (DynamoDB + DSQL cluster + Lambdas)
+sam build --template-file template.yaml
+sam deploy --guided --stack-name DevilYouNoSQLStack
 ```
 
-### 2. Web Interface (Recommended)
+### 2. Initialize DSQL Database
 ```bash
+# Set the DSQL endpoint from SAM output
+export DSQL_ENDPOINT=<your-cluster-endpoint>.dsql.us-east-1.on.aws
+export AWS_REGION=us-east-1
+
 # Install dependencies
 npm install
 
-# Start the web interface
-npm run server
+# Run complete setup (creates tables, indexes, seeds data)
+npm run setup
+```
 
+### 3. Run Demonstrations
+```bash
+# Command line demo
+npm run demo
+
+# Web interface (recommended)
+npm run server
 # Open browser to http://localhost:3000
 ```
 
-### 3. Command Line Interface
-```bash
-# Complete setup (verify + seed data)
-npm run setup
+---
 
-# Run main demo (philosophy + performance analysis)
-npm run demo
+## 🏗️ Infrastructure Details
 
-# Individual operations
-npm run verify    # Verify database connectivity
-npm run seed      # Seed sample data
-```
+### SAM Deployment Creates:
+- ✅ **Aurora DSQL Cluster** (empty, ready for tables)
+- ✅ **DynamoDB Table** with GSI indexes (ready to use)
+- ✅ **Lambda Functions** for both databases
+- ✅ **API Gateway** endpoints for testing
+
+### Setup Script Creates:
+- ✅ **DSQL Tables** (`soul_contracts`, `soul_contract_events`, `soul_ledger`)
+- ✅ **DSQL Indexes** (optional, for optimal performance)
+- ✅ **Sample Data** in both databases
+- ✅ **Validation** of complete setup
+
+### Why Setup is Required:
+**SAM Limitation**: CloudFormation cannot create DSQL tables/indexes yet, only the cluster. The setup script handles the database schema creation that SAM cannot do.
+
+### After Stack Deletion/Redeployment:
+If you delete and redeploy the SAM stack, you must run `npm run setup` again because:
+- **DynamoDB**: Automatically recreated by SAM with all data
+- **DSQL**: Only cluster recreated, tables/indexes/data must be recreated by setup script
 
 ---
 
