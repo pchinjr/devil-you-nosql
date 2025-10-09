@@ -27,22 +27,15 @@ Both sides receive identical datasets via the setup/seeding workflow so demos an
 
 ### DynamoDB Single-Table Layout
 
-```mermaid
-flowchart LR
-    subgraph Partition ["DDB Partition (PK = SOUL#soul_id)"]
-        Contract["SK = CONTRACT#N:status, contract_location, soul_type, updated_at"]
-        Events["SK = EVENT#ts:description, timestamp"]
-        Ledger["SK = LEDGER#ts:amount, timestamp, description"]
-    end
+| PK            | SK                        | GSI1PK             | GSI1SK             | Core Attributes                                                     |
+|---------------|---------------------------|--------------------|--------------------|---------------------------------------------------------------------|
+| `SOUL#<id>`   | `CONTRACT`                | `STATUS#<status>`  | `<updated_at ISO>` | `status`, `soul_type`, `contract_location`, `updated_at`, `createdAt` |
+| `SOUL#<id>`   | `EVENT#<timestamp>`       | `EVENT#<date>`     | `<timestamp ISO>`  | `description`, `eventType`, `timestamp`                              |
+| `SOUL#<id>`   | `LEDGER#<timestamp>`      | `LEDGER#<date>`    | `<timestamp ISO>`  | `amount`, `description`, `timestamp`                                 |
 
-    Contract -->|Projects| GSI["GSI1PK = STATUS#status GSI1SK = timestamp"]
-    Events -->|Projects| GSI
-    Ledger -->|Projects| GSI
-```
-
-- All records for a soul share the same `PK` (`SOUL#<id>`).
-- Secondary access patterns (status, event date, ledger date) project into GSI1 (`GSI1PK/GSI1SK`).
-- Events and ledger entries are distinguished by prefixing the sort key (`EVENT#`, `LEDGER#`).
+- All records for a soul share the same partition key (`PK = SOUL#<id>`).
+- Sort keys encode item type and chronological ordering (`CONTRACT`, `EVENT#`, `LEDGER#`).
+- A single GSI (`STATUS#`, `EVENT#date`, `LEDGER#date`) backs alternate read patterns.
 
 ### Aurora DSQL Normalized Schema
 
