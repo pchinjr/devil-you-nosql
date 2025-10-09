@@ -31,11 +31,11 @@ Both sides receive identical datasets via the setup/seeding workflow so demos an
 flowchart LR
     subgraph Partition ["DDB Partition (PK = SOUL#<soul_id>)"]
         Contract["SK = CONTRACT\nstatus, contract_location, soul_type, updated_at"]
-        Events["SK = EVENT#<timestamp>\ndescription, timestamp"]
-        Ledger["SK = LEDGER#<timestamp>\namount, timestamp, description"]
+        Events["SK = EVENT#<timestamp> \n description, timestamp"]
+        Ledger["SK = LEDGER#<timestamp> \n amount, timestamp, description"]
     end
 
-    Contract -->|Projects| GSI["GSI1PK = STATUS#<status>\nGSI1SK = <timestamp>"]
+    Contract -->|Projects| GSI["GSI1PK = STATUS#<status> GSI1SK = <timestamp>"]
     Events -->|Projects| GSI
     Ledger -->|Projects| GSI
 ```
