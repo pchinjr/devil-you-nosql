@@ -102,20 +102,32 @@ class DataValidator {
         ORDER BY tablename, indexname
       `);
       
-      const expectedIndexes = [
-        'soul_contracts_soul_id_idx',
-        'soul_contract_events_soul_contract_id_idx',
-        'soul_ledger_soul_contract_id_idx'
+      const actualIndexes = indexes.rows
+        .map(r => r.indexname)
+        .filter(name => !name.endsWith('_pkey'));
+
+      const recommendedIndexes = [
+        {
+          description: 'soul_contract_events.soul_contract_id',
+          name: 'ix_events_scid'
+        },
+        {
+          description: 'soul_ledger.soul_contract_id',
+          name: 'ix_ledger_scid'
+        }
       ];
-      
-      const actualIndexes = indexes.rows.map(r => r.indexname).filter(name => !name.endsWith('_pkey'));
-      const missingIndexes = expectedIndexes.filter(idx => !actualIndexes.includes(idx));
+
+      const missingIndexes = recommendedIndexes.filter(
+        ({ name }) => !actualIndexes.includes(name)
+      );
       
       console.log(`✓ Found ${actualIndexes.length} indexes`);
       
       if (missingIndexes.length > 0) {
         console.log('💡 Recommended indexes not found (performance may be slower):');
-        missingIndexes.forEach(idx => console.log(`   - ${idx}`));
+        missingIndexes.forEach(({ description, name }) => {
+          console.log(`   - ${description} (${name})`);
+        });
         console.log('   Run: node scripts/createDsqlIndexes.js to create them');
       } else {
         console.log('✓ All recommended indexes present');

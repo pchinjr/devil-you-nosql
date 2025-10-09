@@ -26,6 +26,41 @@ class SeedData {
     }
 
     this.dynamoClient = new DynamoDBClient({ region: AWS_REGION });
+
+    const target = typeof options.target === 'string' ? options.target.toLowerCase() : undefined;
+    let seedDynamo = true;
+    let seedDsql = true;
+
+    if (target === 'dsql') {
+      seedDynamo = false;
+      seedDsql = true;
+    } else if (target === 'dynamo') {
+      seedDynamo = true;
+      seedDsql = false;
+    }
+
+    if (options.dsqlOnly) {
+      seedDynamo = false;
+      seedDsql = true;
+    }
+
+    if (options.dynamoOnly) {
+      seedDynamo = true;
+      seedDsql = false;
+    }
+
+    if (options.skipDsql) {
+      seedDsql = false;
+    }
+
+    if (options.skipDynamo) {
+      seedDynamo = false;
+    }
+
+    this.targets = {
+      dynamo: seedDynamo,
+      dsql: seedDsql
+    };
   }
 
   prepareDataset() {
@@ -177,10 +212,106 @@ class SeedData {
     const client = await this.connectDSQL();
     await client.connect();
 
-    try {
-      await client.query('BEGIN');
+    const totalEvents = souls.reduce((acc, soul) => acc + soul.events.length, 0);
+    console.log(`Seeding Aurora DSQL with ${souls.length} souls, ${totalEvents} events, ${ledgerEntries.length} ledger entries...`);
 
+    const ROW_LIMIT = 3000;
+    let rowsInTransaction = 0;
+    let inTransaction = false;
+    let transactionsCommitted = 0;
+    let totalRowsCommitted = 0;
+    let soulsInserted = 0;
+    let eventsInserted = 0;
+    let ledgerInserted = 0;
+
+    const SOUL_LOG_INTERVAL = souls.length ? Math.max(10, Math.ceil(souls.length / 10)) : Infinity;
+    const EVENT_LOG_INTERVAL = totalEvents ? Math.max(50, Math.ceil(totalEvents / 10)) : Infinity;
+    const LEDGER_LOG_INTERVAL = ledgerEntries.length ? Math.max(50, Math.ceil(ledgerEntries.length / 10)) : Infinity;
+
+    const nextLogThreshold = {
+      souls: SOUL_LOG_INTERVAL,
+      events: EVENT_LOG_INTERVAL,
+      ledger: LEDGER_LOG_INTERVAL
+    };
+
+    const maybeLogProgress = (reason = 'Progress', force = false) => {
+      const shouldLogSouls = soulsInserted >= nextLogThreshold.souls;
+      const shouldLogEvents = eventsInserted >= nextLogThreshold.events;
+      const shouldLogLedger = ledgerInserted >= nextLogThreshold.ledger;
+
+      if (!force && !shouldLogSouls && !shouldLogEvents && !shouldLogLedger) {
+        return;
+      }
+
+      const prefix = reason ? `  [DSQL] ${reason}` : '  [DSQL]';
+      console.log(
+        `${prefix}: souls ${soulsInserted}/${souls.length}, events ${eventsInserted}/${totalEvents}, ledger ${ledgerInserted}/${ledgerEntries.length}, rows this txn ${rowsInTransaction}, commits ${transactionsCommitted}`
+      );
+
+      if (shouldLogSouls && SOUL_LOG_INTERVAL !== Infinity) {
+        while (nextLogThreshold.souls <= soulsInserted) {
+          nextLogThreshold.souls += SOUL_LOG_INTERVAL;
+        }
+      }
+
+      if (shouldLogEvents && EVENT_LOG_INTERVAL !== Infinity) {
+        while (nextLogThreshold.events <= eventsInserted) {
+          nextLogThreshold.events += EVENT_LOG_INTERVAL;
+        }
+      }
+
+      if (shouldLogLedger && LEDGER_LOG_INTERVAL !== Infinity) {
+        while (nextLogThreshold.ledger <= ledgerInserted) {
+          nextLogThreshold.ledger += LEDGER_LOG_INTERVAL;
+        }
+      }
+    };
+
+    const begin = async () => {
+      if (!inTransaction) {
+        await client.query('BEGIN');
+        inTransaction = true;
+        rowsInTransaction = 0;
+        maybeLogProgress('Transaction started', true);
+      }
+    };
+
+    const commit = async (reason) => {
+      if (inTransaction) {
+        const rowsThisTxn = rowsInTransaction;
+        await client.query('COMMIT');
+        inTransaction = false;
+        rowsInTransaction = 0;
+        transactionsCommitted += 1;
+        totalRowsCommitted += rowsThisTxn;
+        const commitReason = reason ? ` (${reason})` : '';
+        console.log(`  [DSQL] Commit #${transactionsCommitted}: ${rowsThisTxn} rows${commitReason}`);
+        maybeLogProgress('Post-commit progress', true);
+      }
+    };
+
+    const rollback = async () => {
+      if (inTransaction) {
+        await client.query('ROLLBACK');
+        inTransaction = false;
+        rowsInTransaction = 0;
+      }
+    };
+
+    const reserveRows = async (rowsNeeded) => {
+      await begin();
+
+      if (rowsInTransaction + rowsNeeded > ROW_LIMIT) {
+        await commit('row limit reached');
+        await begin();
+      }
+
+      rowsInTransaction += rowsNeeded;
+    };
+
+    try {
       for (const soul of souls) {
+        await reserveRows(1);
         await client.query(
           `INSERT INTO soul_contracts (id, contract_status, soul_type, contract_location, updated_at)
            VALUES ($1, $2, $3, $4, $5)
@@ -191,28 +322,41 @@ class SeedData {
              updated_at = EXCLUDED.updated_at`,
           [soul.soulId, soul.status, soul.soulType, soul.contractLocation, soul.createdAt]
         );
+        soulsInserted += 1;
+        maybeLogProgress();
 
         for (const event of soul.events) {
+          await reserveRows(1);
           await client.query(
             `INSERT INTO soul_contract_events (soul_contract_id, event_time, description)
              VALUES ($1, $2, $3)`,
             [soul.soulId, event.eventTime, event.description]
           );
+          eventsInserted += 1;
+          maybeLogProgress();
         }
       }
 
       for (const entry of ledgerEntries) {
+        await reserveRows(1);
         await client.query(
           `INSERT INTO soul_ledger (soul_contract_id, amount, transaction_time, description)
            VALUES ($1, $2, $3, $4)`,
           [entry.soulId, entry.amount, entry.timestamp, entry.description]
         );
+        ledgerInserted += 1;
+        maybeLogProgress();
       }
 
-      await client.query('COMMIT');
-      console.log(`✓ Aurora DSQL seeding complete (${souls.length} souls, ${ledgerEntries.length} ledger entries)`);
+      await commit('final flush');
+      maybeLogProgress('Final progress', true);
+      console.log(
+        `✓ Aurora DSQL seeding complete (${souls.length} souls, ${totalEvents} events, ${ledgerEntries.length} ledger entries across ${transactionsCommitted || 1} transaction${transactionsCommitted === 1 ? '' : 's'}, total rows ${totalRowsCommitted})`
+      );
     } catch (error) {
-      await client.query('ROLLBACK');
+      console.log('  [DSQL] Rolling back active transaction');
+      maybeLogProgress('Progress before rollback', true);
+      await rollback();
       throw error;
     } finally {
       await client.end();
@@ -244,13 +388,27 @@ class SeedData {
     console.log(`  Souls: ${soulCount}`);
     console.log(`  Events per soul: ${eventsPerSoul}`);
     console.log(`  Ledger entries: ${ledgerEntries}\n`);
+    const targets = [
+      this.targets.dynamo ? 'DynamoDB' : null,
+      this.targets.dsql ? 'Aurora DSQL' : null
+    ].filter(Boolean);
+    console.log(`  Targets: ${targets.length ? targets.join(', ') : 'none'}\n`);
 
     const start = Date.now();
 
     try {
       const dataset = this.prepareDataset();
-      await this.seedDynamoDB(dataset);
-      await this.seedDSQL(dataset);
+      if (this.targets.dynamo) {
+        await this.seedDynamoDB(dataset);
+      } else {
+        console.log('⚠ Skipping DynamoDB seeding (disabled by options)');
+      }
+
+      if (this.targets.dsql) {
+        await this.seedDSQL(dataset);
+      } else {
+        console.log('⚠ Skipping Aurora DSQL seeding (disabled by options)');
+      }
 
       const duration = ((Date.now() - start) / 1000).toFixed(2);
       console.log(`\n✅ Dataset seeding completed in ${duration}s`);
@@ -280,12 +438,13 @@ function parseCliArgs(argv) {
     }
 
     const key = arg.slice(2);
+    const normalizedKey = key.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
     const next = argv[i + 1];
     if (next && !next.startsWith('--')) {
-      result[key] = next;
+      result[normalizedKey] = next;
       i += 1;
     } else {
-      result[key] = true;
+      result[normalizedKey] = true;
     }
   }
   return result;
@@ -300,7 +459,12 @@ if (require.main === module) {
   const seeder = new SeedData({
     soulCount: args.souls ?? args.soulCount,
     eventsPerSoul: args.events ?? args.eventsPerSoul,
-    ledgerEntries: args.ledger ?? args.ledgerEntries
+    ledgerEntries: args.ledger ?? args.ledgerEntries,
+    target: args.target,
+    dsqlOnly: args.dsqlOnly,
+    dynamoOnly: args.dynamoOnly,
+    skipDsql: args.skipDsql,
+    skipDynamo: args.skipDynamo
   });
 
   seeder.run();

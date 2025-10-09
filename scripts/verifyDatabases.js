@@ -93,11 +93,17 @@ class DatabaseVerifier {
       
       const expectedTables = ['soul_contracts', 'soul_contract_events', 'soul_ledger'];
       const existingTables = tablesResult.rows.map(row => row.table_name);
-      
+
+      if (existingTables.length === 0) {
+        console.log('  ℹ️ No expected tables found yet – assuming first-time setup.');
+        console.log('     Connectivity verified, structure checks will run after table creation.');
+        return true;
+      }
+
       for (const table of expectedTables) {
         if (existingTables.includes(table)) {
           console.log(`  ✅ Table '${table}' exists`);
-          
+
           // Count rows
           const countResult = await client.query(`SELECT COUNT(*) as count FROM ${table}`);
           console.log(`    📈 Rows: ${countResult.rows[0].count}`);
