@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Devil You NoSQL - Database Comparison Tool</title>
-    <style>
+    <title>Devil You NoSQL - Ghost Rider Control Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+        <style>
         * {
             margin: 0;
             padding: 0;
@@ -12,67 +15,100 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
-            color: #fff;
+            font-family: 'Roboto Mono', monospace;
+            background: radial-gradient(circle at 25% 10%, rgba(255, 120, 0, 0.45), transparent 55%),
+                        radial-gradient(circle at 80% 0%, rgba(255, 70, 0, 0.35), transparent 70%),
+                        linear-gradient(135deg, #050607 0%, #140b0a 45%, #1b0905 100%);
+            color: #f5eadc;
             min-height: 100vh;
-            padding: 20px;
+            padding: 26px 28px 60px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background:
+                repeating-linear-gradient(120deg, rgba(255, 120, 0, 0.09) 0px, rgba(255, 120, 0, 0.09) 8px, transparent 8px, transparent 20px),
+                radial-gradient(circle at 50% 0%, rgba(255, 200, 0, 0.12), transparent 60%);
+            mix-blend-mode: screen;
         }
 
         .container {
             max-width: 1200px;
             margin: 0 auto;
+            position: relative;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 32px;
         }
 
         .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+            font-family: 'Bangers', cursive;
+            letter-spacing: 4px;
+            font-size: 3.2rem;
+            margin-bottom: 6px;
+            background: linear-gradient(90deg, #ff9333 0%, #ffc400 35%, #ffe066 70%, #ffffff 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            text-shadow: 0 0 18px rgba(255, 130, 0, 0.45);
         }
 
         .header p {
-            color: #ccc;
-            font-size: 1.1rem;
+            color: rgba(255, 220, 180, 0.85);
+            font-size: 1rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
 
         .tabs {
             display: flex;
-            margin-bottom: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
+            margin-bottom: 22px;
+            background: rgba(20, 16, 12, 0.65);
+            border-radius: 12px;
             overflow: hidden;
+            border: 1px solid rgba(255, 125, 0, 0.25);
+            backdrop-filter: blur(8px);
         }
 
         .tab {
             flex: 1;
-            padding: 15px;
+            padding: 16px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
             border: none;
             background: transparent;
-            color: #fff;
-            font-size: 16px;
+            color: rgba(255, 215, 180, 0.7);
+            font-size: 15px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .tab:hover {
+            color: #ffd27f;
         }
 
         .tab.active {
-            background: #ff6b6b;
+            background: linear-gradient(135deg, rgba(255, 115, 0, 0.9), rgba(220, 45, 0, 0.9));
+            color: #fff;
+            box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.35);
         }
 
         .tab-content {
             display: none;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 20px;
+            background: rgba(12, 9, 7, 0.72);
+            border-radius: 14px;
+            padding: 24px;
             margin-bottom: 20px;
+            border: 1px solid rgba(255, 120, 0, 0.2);
+            box-shadow: 0 18px 32px rgba(0, 0, 0, 0.35);
         }
 
         .tab-content.active {
@@ -81,78 +117,110 @@
 
         .action-buttons {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
             margin-bottom: 20px;
         }
 
         .benchmark-controls {
             display: flex;
             align-items: center;
-            gap: 15px;
-            margin: 20px 0;
+            gap: 18px;
+            margin: 20px 0 26px;
             flex-wrap: wrap;
         }
 
         .benchmark-controls label {
             font-weight: 600;
-            color: #ffd93d;
+            color: #ffb347;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .benchmark-controls input {
             width: 120px;
-            padding: 10px;
+            padding: 10px 14px;
             border: none;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.2);
-            color: #fff;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.16);
+            color: #ffecd1;
             font-size: 14px;
         }
 
         .btn {
-            padding: 12px 20px;
+            padding: 13px 22px;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
             transition: all 0.3s;
             text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, rgba(255, 255, 255, 0.25), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn:hover::before {
+            opacity: 1;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
         }
 
         .btn-primary {
-            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
-            color: white;
+            background: linear-gradient(120deg, #ff6b00, #ff8e00);
+            color: #180c05;
         }
 
         .btn-secondary {
-            background: linear-gradient(45deg, #4ecdc4, #44a08d);
-            color: white;
+            background: linear-gradient(120deg, #e65b16, #fda403);
+            color: #180c05;
         }
 
         .btn-info {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2f2a88 0%, #5b3bc1 100%);
             border: none;
-            color: white;
+            color: #f4edff;
         }
 
-        .btn-info:hover {
-            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-            transform: translateY(-2px);
+        .btn-warning {
+            background: linear-gradient(120deg, #ffd166, #ffe28a);
+            color: #2d1b0f;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .demo-info {
-            margin-top: 20px;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            border-left: 3px solid #4ecdc4;
+            margin-top: 18px;
+            padding: 16px 18px;
+            background: rgba(20, 16, 12, 0.82);
+            border-radius: 10px;
+            border-left: 4px solid rgba(255, 110, 0, 0.9);
         }
 
         .demo-info h4 {
             margin-top: 0;
-            color: #4ecdc4;
+            color: #ffb347;
             font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .demo-info ul {
@@ -162,68 +230,45 @@
 
         .demo-info li {
             margin: 8px 0;
-            line-height: 1.4;
-        }
-
-        .btn-warning {
-            background: linear-gradient(45deg, #ffd93d, #ffed4e);
-            color: #333;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
+            line-height: 1.45;
         }
 
         .results {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
-            backdrop-filter: blur(10px);
+            background: rgba(12, 9, 7, 0.78);
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 24px;
+            border: 1px solid rgba(255, 120, 0, 0.22);
+            box-shadow: 0 18px 34px rgba(0, 0, 0, 0.4);
         }
 
         .results h3 {
-            margin-bottom: 15px;
-            color: #ffd93d;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+            color: #ffbf55;
+            letter-spacing: 1px;
         }
 
         .terminal-output {
-            background: #1e1e1e;
-            padding: 25px;
-            border-radius: 8px;
-            overflow-x: auto;
-            border: 1px solid #333;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-        }
-
-        .terminal-output pre {
-            margin: 0;
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-            font-size: 14px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 13px;
             line-height: 1.5;
-            color: #e6e6e6;
+            color: #1fff9f;
+            border: 1px solid rgba(0, 255, 170, 0.25);
+            max-height: 460px;
+            overflow-y: auto;
             white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .benchmark-form {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 15px;
-            align-items: end;
         }
 
         .loading {
             display: none;
             text-align: center;
-            padding: 20px;
+            padding: 24px;
+            background: rgba(8, 6, 4, 0.85);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 120, 0, 0.25);
         }
 
         .loading.show {
@@ -231,9 +276,9 @@
         }
 
         .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 120, 0, 0.25);
             border-radius: 50%;
-            border-top: 3px solid #ff6b6b;
+            border-top: 3px solid #ffd166;
             width: 30px;
             height: 30px;
             animation: spin 1s linear infinite;
@@ -247,16 +292,17 @@
 
         @media (max-width: 768px) {
             .header h1 {
-                font-size: 2rem;
+                font-size: 2.4rem;
             }
         }
     </style>
+
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>👹 Devil You NoSQL</h1>
-            <p>Interactive Database Comparison & Benchmarking Tool</p>
+            <h1>🔥 Devil You NoSQL</h1>
+            <p>Ignite the duel between DynamoDB and Aurora DSQL</p>
         </div>
 
         <div class="tabs">
@@ -265,7 +311,8 @@
         </div>
 
         <div id="operations" class="tab-content active">
-            <h3>🔧 Database Operations</h3>
+            <h3>🔧 Workshop of the Rider</h3>
+            <p style="margin-bottom:18px;color:rgba(255,215,180,0.75);">Provision, verify, and recharge each datastore before the flames fly.</p>
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="runSetup()">🚀 Complete Setup</button>
                 <button class="btn btn-warning" onclick="verifyDatabases()">🔍 Verify Databases</button>
@@ -276,7 +323,7 @@
 
         <div id="benchmark" class="tab-content">
             <h3>📊 Benchmark Suite</h3>
-            <p>Run the end-to-end benchmark to compare DynamoDB and Aurora DSQL across real demo workloads.</p>
+            <p style="margin-bottom:18px;color:rgba(255,215,180,0.75);">Light the fuse on full benchmarks to compare DynamoDB and Aurora DSQL across battle-tested workloads.</p>
             <div class="benchmark-controls">
                 <label for="benchmarkIterations">Iterations per scenario</label>
                 <input type="number" id="benchmarkIterations" min="1" value="50">
@@ -284,13 +331,12 @@
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="runDemo()">Run Showcase Demo</button>
                 <button class="btn btn-secondary" onclick="runBenchmarkSuite()">Run Benchmark Suite</button>
-                <button class="btn btn-info" onclick="getBenchmarkHistory()">View Benchmark History</button>
             </div>
         </div>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Processing...</p>
+            <p>Stoking the flames...</p>
         </div>
 
         <div class="results" id="results" style="display: none;">
@@ -619,21 +665,6 @@
             await executeScript('validate.js');
         }
 
-        async function getBenchmarkHistory() {
-            try {
-                const response = await fetch('http://localhost:3000/api/benchmark-results');
-                const results = await response.json();
-                showResults({
-                    benchmarkHistory: results,
-                    tip: 'Click on a filename to see full results'
-                });
-            } catch (error) {
-                showResults({
-                    error: 'Failed to get benchmark history',
-                    details: error.message
-                });
-            }
-        }
     </script>
 </body>
 </html>

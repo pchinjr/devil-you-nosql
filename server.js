@@ -28,7 +28,8 @@ app.post('/api/run-script', (req, res) => {
     'demo.js',
     'seedData.js',
     'verifyDatabases.js',
-    'validate.js'
+    'validate.js',
+    'benchmark.js'
   ];
 
   if (!allowedScripts.includes(script)) {
