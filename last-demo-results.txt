@@ -1,0 +1,351 @@
+THE DEVIL YOU NOSQL
+The Devil You Know vs The Devil You Don't
+
+Warming up connections...
+Warmup complete
+
+DESIGN PARADIGMS COMPARED
+==================================
+SCENARIO 1: Get complete soul profile (user-facing app)
+  Goal: Retrieve soul contract + all events + total power in one operation
+  Use case: Mobile app showing user's complete supernatural profile
+ DynamoDB: 37.1ms avg (26.1-69.6ms) - 57 items
+    Single-table design - all related data co-located
+    How: One query returns contract + events + ledger entries
+    Statistics: P95=69.6ms, StdDev=12.4ms, CV=33.5%
+    Consistency: Good (CV=33.5%)
+ DSQL: 88.7ms avg (73.1-179.2ms) - undefined rows
+    Normalized schema with JOINs
+    How: JOIN 3 tables + aggregate events + sum power
+    Statistics: P95=179.2ms, StdDev=32.1ms, CV=36.2%
+     Consistency: Good (CV=36.2%)
+
+STATISTICAL ANALYSIS:
+   Performance ratio: 2.39x (DSQL vs DynamoDB)
+   Statistical significance: YES (p=0.0010)
+   Effect size: 2.12 (large)
+
+SAMPLE DATA RETURNED TO FRONTEND:
+DynamoDB Items (raw single-table format):
+   Item 1: CONTRACT - betrayer_desert_crossroads_0230 (contract)
+   Item 2: EVENT#2025-02-01T21:38:52.569Z - Contract Created
+   Item 3: EVENT#2025-02-01T21:39:52.569Z - Status Change
+   Item 4: EVENT#2025-02-01T21:40:52.569Z - Status Change
+   Item 5: EVENT#2025-02-01T21:41:52.569Z - Status Change
+   Item 6: EVENT#2025-02-01T21:42:52.569Z - Status Change
+   Item 7: EVENT#2025-02-01T21:43:52.569Z - Status Change
+   Item 8: EVENT#2025-02-01T21:44:52.569Z - Status Change
+   Item 9: EVENT#2025-02-01T21:45:52.569Z - Status Change
+   Item 10: EVENT#2025-02-01T21:46:52.569Z - Status Change
+   Item 11: EVENT#2025-02-01T21:47:52.569Z - Status Change
+   Item 12: EVENT#2025-02-01T21:48:52.569Z - Status Change
+   Item 13: EVENT#2025-02-01T21:49:52.569Z - Status Change
+   Item 14: EVENT#2025-02-01T21:50:52.569Z - Status Change
+   Item 15: EVENT#2025-02-01T21:51:52.569Z - Status Change
+   Item 16: EVENT#2025-02-01T21:52:52.569Z - Status Change
+   Item 17: EVENT#2025-02-01T21:53:52.569Z - Status Change
+   Item 18: EVENT#2025-02-01T21:54:52.569Z - Status Change
+   Item 19: EVENT#2025-02-01T21:55:52.569Z - Status Change
+   Item 20: EVENT#2025-02-01T21:56:52.569Z - Status Change
+   Item 21: EVENT#2025-02-01T21:57:52.569Z - Status Change
+   Item 22: EVENT#2025-02-01T21:58:52.569Z - Status Change
+   Item 23: EVENT#2025-02-01T21:59:52.569Z - Status Change
+   Item 24: EVENT#2025-02-01T22:00:52.569Z - Status Change
+   Item 25: EVENT#2025-02-01T22:01:52.569Z - Status Change
+   Item 26: EVENT#2025-02-01T22:02:52.569Z - Status Change
+   Item 27: EVENT#2025-02-01T22:03:52.569Z - Status Change
+   Item 28: EVENT#2025-02-01T22:04:52.569Z - Status Change
+   Item 29: EVENT#2025-02-01T22:05:52.569Z - Status Change
+   Item 30: EVENT#2025-02-01T22:06:52.569Z - Status Change
+   Item 31: EVENT#2025-02-01T22:07:52.569Z - Status Change
+   Item 32: EVENT#2025-02-01T22:08:52.569Z - Status Change
+   Item 33: EVENT#2025-02-01T22:09:52.569Z - Status Change
+   Item 34: EVENT#2025-02-01T22:10:52.569Z - Status Change
+   Item 35: EVENT#2025-02-01T22:11:52.569Z - Status Change
+   Item 36: EVENT#2025-02-01T22:12:52.569Z - Status Change
+   Item 37: EVENT#2025-02-01T22:13:52.569Z - Status Change
+   Item 38: EVENT#2025-02-01T22:14:52.569Z - Status Change
+   Item 39: EVENT#2025-02-01T22:15:52.569Z - Status Change
+   Item 40: EVENT#2025-02-01T22:16:52.569Z - Status Change
+   Item 41: EVENT#2025-02-01T22:17:52.569Z - Status Change
+   Item 42: EVENT#2025-02-01T22:18:52.569Z - Status Change
+   Item 43: EVENT#2025-02-01T22:19:52.569Z - Status Change
+   Item 44: EVENT#2025-02-01T22:20:52.569Z - Status Change
+   Item 45: EVENT#2025-02-01T22:21:52.569Z - Status Change
+   Item 46: EVENT#2025-02-01T22:22:52.569Z - Status Change
+   Item 47: EVENT#2025-02-01T22:23:52.569Z - Status Change
+   Item 48: EVENT#2025-02-01T22:24:52.569Z - Status Change
+   Item 49: EVENT#2025-02-01T22:25:52.569Z - Status Change
+   Item 50: EVENT#2025-02-01T22:26:52.569Z - Status Change
+   Item 51: EVENT#2025-02-01T22:27:52.569Z - Status Change
+   Item 52: LEDGER#2025-09-18T10:17:11.773Z - Soul power transaction: 651
+   Item 53: LEDGER#2025-09-23T11:24:02.488Z - Soul power transaction: 455
+   Item 54: LEDGER#2025-09-28T20:20:54.767Z - Soul power transaction: 227
+   Item 55: LEDGER#2025-10-02T19:50:02.793Z - Soul power transaction: 919
+   Item 56: LEDGER#2025-10-05T12:11:35.128Z - Soul power transaction: 434
+   Item 57: LEDGER#2025-10-05T22:39:09.664Z - Soul power transaction: 304
+DSQL Result (normalized tables rendered as list):
+   Contract: betrayer_desert_crossroads_0230 - Status: Bound, Type: Betrayer, Location: Desert_Crossroads
+   Event 1: 2025-02-01T21:38:52.569Z - Contract Created
+   Event 2: 2025-02-01T21:39:52.569Z - Status Change
+   Event 3: 2025-02-01T21:40:52.569Z - Status Change
+   Event 4: 2025-02-01T21:41:52.569Z - Status Change
+   Event 5: 2025-02-01T21:42:52.569Z - Status Change
+   Event 6: 2025-02-01T21:43:52.569Z - Status Change
+   Event 7: 2025-02-01T21:44:52.569Z - Status Change
+   Event 8: 2025-02-01T21:45:52.569Z - Status Change
+   Event 9: 2025-02-01T21:46:52.569Z - Status Change
+   Event 10: 2025-02-01T21:47:52.569Z - Status Change
+   Event 11: 2025-02-01T21:48:52.569Z - Status Change
+   Event 12: 2025-02-01T21:49:52.569Z - Status Change
+   Event 13: 2025-02-01T21:50:52.569Z - Status Change
+   Event 14: 2025-02-01T21:51:52.569Z - Status Change
+   Event 15: 2025-02-01T21:52:52.569Z - Status Change
+   Event 16: 2025-02-01T21:53:52.569Z - Status Change
+   Event 17: 2025-02-01T21:54:52.569Z - Status Change
+   Event 18: 2025-02-01T21:55:52.569Z - Status Change
+   Event 19: 2025-02-01T21:56:52.569Z - Status Change
+   Event 20: 2025-02-01T21:57:52.569Z - Status Change
+   Event 21: 2025-02-01T21:58:52.569Z - Status Change
+   Event 22: 2025-02-01T21:59:52.569Z - Status Change
+   Event 23: 2025-02-01T22:00:52.569Z - Status Change
+   Event 24: 2025-02-01T22:01:52.569Z - Status Change
+   Event 25: 2025-02-01T22:02:52.569Z - Status Change
+   Event 26: 2025-02-01T22:03:52.569Z - Status Change
+   Event 27: 2025-02-01T22:04:52.569Z - Status Change
+   Event 28: 2025-02-01T22:05:52.569Z - Status Change
+   Event 29: 2025-02-01T22:06:52.569Z - Status Change
+   Event 30: 2025-02-01T22:07:52.569Z - Status Change
+   Event 31: 2025-02-01T22:08:52.569Z - Status Change
+   Event 32: 2025-02-01T22:09:52.569Z - Status Change
+   Event 33: 2025-02-01T22:10:52.569Z - Status Change
+   Event 34: 2025-02-01T22:11:52.569Z - Status Change
+   Event 35: 2025-02-01T22:12:52.569Z - Status Change
+   Event 36: 2025-02-01T22:13:52.569Z - Status Change
+   Event 37: 2025-02-01T22:14:52.569Z - Status Change
+   Event 38: 2025-02-01T22:15:52.569Z - Status Change
+   Event 39: 2025-02-01T22:16:52.569Z - Status Change
+   Event 40: 2025-02-01T22:17:52.569Z - Status Change
+   Event 41: 2025-02-01T22:18:52.569Z - Status Change
+   Event 42: 2025-02-01T22:19:52.569Z - Status Change
+   Event 43: 2025-02-01T22:20:52.569Z - Status Change
+   Event 44: 2025-02-01T22:21:52.569Z - Status Change
+   Event 45: 2025-02-01T22:22:52.569Z - Status Change
+   Event 46: 2025-02-01T22:23:52.569Z - Status Change
+   Event 47: 2025-02-01T22:24:52.569Z - Status Change
+   Event 48: 2025-02-01T22:25:52.569Z - Status Change
+   Event 49: 2025-02-01T22:26:52.569Z - Status Change
+   Event 50: 2025-02-01T22:27:52.569Z - Status Change
+   Ledger 1: 2025-09-18T10:17:11.773Z - 651.000000 (Soul power transaction: 651)
+   Ledger 2: 2025-09-23T11:24:02.488Z - 455.000000 (Soul power transaction: 455)
+   Ledger 3: 2025-09-28T20:20:54.767Z - 227.000000 (Soul power transaction: 227)
+   Ledger 4: 2025-10-02T19:50:02.793Z - 919.000000 (Soul power transaction: 919)
+   Ledger 5: 2025-10-05T12:11:35.128Z - 434.000000 (Soul power transaction: 434)
+   Ledger 6: 2025-10-05T22:39:09.664Z - 304.000000 (Soul power transaction: 304)
+
+SCENARIO 2: Business analytics (executive dashboard)
+    Goal: Analyze soul power distribution across all locations
+    Use case: Executive dashboard showing business metrics
+
+ DSQL: 157.394855ms - Complex analytics in single query
+    Analyzed 6 locations with aggregations
+    How: JOIN + GROUP BY + multiple aggregations + calculations
+    Features: COUNT, SUM, AVG, conditional aggregation, percentage calc
+    Result: Complete business intelligence in one query
+
+DynamoDB: Implementing equivalent analytics with multiple operations
+    Completed in 29539.30399ms using 1006 separate queries
+    Analyzed 6 locations
+    How: Multiple GSI queries + client-side aggregation + sorting
+    Complexity: N+M queries (N locations + M souls) + application logic
+    Cost: 1006 read operations vs 1 DSQL query
+    Performance ratio: 187.7x slower than DSQL
+
+ANALYTICS RESULTS FOR FRONTEND:
+DSQL Business Intelligence (ready for dashboard):
+   Location 1: Hell_Gate - 172 souls, 42 redeemed (24.4%), Power: 442827.000000
+   Location 2: Desert_Crossroads - 180 souls, 48 redeemed (26.7%), Power: 439161.000000
+   Location 3: Graveyard - 168 souls, 51 redeemed (30.4%), Power: 427399.000000
+   Location 4: Highway_66 - 157 souls, 45 redeemed (28.7%), Power: 424536.000000
+   Location 5: Abandoned_Church - 159 souls, 37 redeemed (23.3%), Power: 400362.000000
+   Location 6: City_Alley - 164 souls, 46 redeemed (28.0%), Power: 398207.000000
+DynamoDB Equivalent (required client processing):
+   Location 1: Hell_Gate - 172 souls, 42 redeemed (24.4%), Power: 442827
+   Location 2: Desert_Crossroads - 180 souls, 48 redeemed (26.7%), Power: 439161
+   Location 3: Graveyard - 168 souls, 51 redeemed (30.4%), Power: 427399
+   Location 4: Highway_66 - 157 souls, 45 redeemed (28.7%), Power: 424536
+   Location 5: Abandoned_Church - 159 souls, 37 redeemed (23.3%), Power: 400362
+   Location 6: City_Alley - 164 souls, 46 redeemed (28.0%), Power: 398207
+
+SCENARIO 3: Soul contract status update (transaction scenario)
+    Goal: Update contract status + add event + update ledger
+    Use case: Ghost Rider completing a soul redemption
+
+DynamoDB Transaction:
+   Transaction completed in 49.283381ms
+   How: TransactWrite with 3 operations (1 update + 2 inserts)
+   Operations: Contract status updated, event logged, ledger entry added
+   ACID: Strong consistency within partition (all items share PK)
+   Constraint: All operations must be in same partition for ACID guarantees
+   Items written (DynamoDB single-table view):
+     - CONTRACT -> status=Redeemed updated_at=2025-10-09T22:59:41.194Z
+     - EVENT#2025-10-09T22:59:41.194Z -> description="Soul redeemed by Ghost Rider"
+     - LEDGER#2025-10-09T22:59:41.194Z -> amount=500
+
+DSQL Transaction:
+   Transaction completed in 193.707182ms
+   How: SQL transaction with BEGIN/COMMIT across 3 normalized tables
+   Operations: Contract updated, event inserted, ledger entry inserted
+   ACID: Full transaction isolation across any tables (not limited by partitions)
+   Flexibility: Can include complex business logic, joins, constraints
+   Rows touched (DSQL normalized view):
+     - soul_contracts -> status=Redeemed updated_at=2025-10-10T02:59:41.194Z
+     - soul_contract_events -> 2025-10-10T02:59:41.194Z: "Soul redeemed by Ghost Rider"
+
+WRITE OPERATIONS STATISTICAL SUMMARY:
+  DynamoDB observed time: 49.28ms
+  DSQL observed time: 193.71ms
+  Relative gap: 3.93x slower on DSQL (144.42ms difference)
+
+WRITE OPERATIONS INSIGHTS:
+  DynamoDB measurement reflects a partition-local TransactWrite (1 update + 2 inserts).
+  DSQL measurement captures a BEGIN/COMMIT that touches three normalized tables with IAM-authenticated connection.
+  Demonstrated outcome: DynamoDB completed faster in this run. Re-run the demo to gather additional samples for a fuller distribution.
+
+NATURAL STRENGTHS DEMONSTRATION
+==================================
+
+DYNAMODB STRENGTH: Batch Operations
+    Scenario: Retrieve multiple soul contracts for dashboard list
+    Use case: Admin panel showing 10 recent contracts
+    Testing: Compare batch vs individual operations
+
+    DynamoDB BatchGetItem: 30.818083ms for 10 contracts
+    How: Single API call retrieves all items simultaneously
+    Per-item cost: 3.1ms per contract
+    Network efficiency: 1 round-trip vs 10 individual calls
+
+    COMPARISON: Individual DynamoDB queries (inefficient approach)
+     Individual queries: 282.578058ms for 10 contracts
+    Per-item cost: 28.3ms per contract
+    Network overhead: 10 round-trips vs 1 batch call
+    Efficiency gain: 9.2x faster with batching
+
+    COMPARISON: DSQL batching approaches
+    DSQL IN clause: 30.561913ms for 10 contracts
+    How: Single query with ANY($1::text[]) - proper SQL batching
+    Per-item cost: 3.1ms per contract
+    Native SQL set operation - database optimized
+
+    COMPARISON: DSQL parallel queries (suboptimal approach)
+     DSQL parallel queries: 214.176461ms for 10 contracts
+    How: 10 parallel SELECT statements
+    Per-item cost: 21.4ms per contract
+    Suboptimal - forces multiple connections and queries
+
+    BATCH OPERATIONS ANALYSIS:
+    DynamoDB BatchGet: 30.818083ms (winner - purpose-built API)
+    DSQL IN clause: 30.561913ms (1.0x slower - proper SQL)
+    DynamoDB Individual: 282.578058ms (9.2x slower - network overhead)
+    DSQL Parallel: 214.176461ms (6.9x slower - suboptimal)
+    Key insight: SQL IN clause is the proper way to batch in SQL databases
+    Use case: DynamoDB wins for purpose-built APIs, SQL wins with proper syntax
+    Scalability: Both approaches scale well with proper implementation
+
+BATCH OPERATION RESULTS FOR FRONTEND:
+Sample contracts retrieved:
+   Contract 1: evil_abandoned_church_0197 - Bound at Abandoned_Church
+   Contract 2: sinner_desert_crossroads_0285 - Bound at Desert_Crossroads
+   Contract 3: murderer_abandoned_church_0310 - Bound at Abandoned_Church
+   Contract 4: evil_city_alley_0796 - Bound at City_Alley
+   Contract 5: murderer_highway_66_0239 - Bound at Highway_66
+   Contract 6: murderer_desert_crossroads_0015 - Bound at Desert_Crossroads
+   Contract 7: betrayer_desert_crossroads_0884 - Bound at Desert_Crossroads
+   Contract 8: betrayer_graveyard_0480 - Bound at Graveyard
+   Contract 9: corrupt_highway_66_0394 - Bound at Highway_66
+   Contract 10: corrupt_hell_gate_0590 - Bound at Hell_Gate
+DSQL Batch result (normalized rows):
+   Contract 1: betrayer_desert_crossroads_0884 - Bound at Desert_Crossroads
+   Contract 2: betrayer_graveyard_0480 - Bound at Graveyard
+   Contract 3: corrupt_hell_gate_0590 - Bound at Hell_Gate
+   Contract 4: corrupt_highway_66_0394 - Bound at Highway_66
+   Contract 5: evil_abandoned_church_0197 - Bound at Abandoned_Church
+   Contract 6: evil_city_alley_0796 - Bound at City_Alley
+   Contract 7: murderer_abandoned_church_0310 - Bound at Abandoned_Church
+   Contract 8: murderer_desert_crossroads_0015 - Bound at Desert_Crossroads
+   Contract 9: murderer_highway_66_0239 - Bound at Highway_66
+   Contract 10: sinner_desert_crossroads_0285 - Bound at Desert_Crossroads
+
+DSQL STRENGTH: Complex Business Logic
+    Scenario: Advanced analytics with business rules
+    Use case: Risk analysis for soul contract portfolio
+    Testing: Statistical performance analysis
+
+    Complex analysis: 577.2ms avg (525.9-760.5ms)
+    6 locations analyzed with business logic
+    How: Common Table Expressions + window functions + complex aggregations
+    Features: Multi-level aggregation, ranking, percentage calculations
+    Statistics: P95=760.5ms, CV=17.8%
+    Business value: Risk analysis, profitability ranking, activity metrics
+    Observation: SQL engine performs multi-table aggregation in one pass
+
+COMPLEX ANALYTICS RESULTS FOR FRONTEND:
+Risk Analysis Dashboard Data (DSQL):
+   Location 1: Highway_66 - Rank: 1, Activity: 100.0%, Net Power: 136963.76
+   Location 2: Hell_Gate - Rank: 2, Activity: 100.0%, Net Power: 129424.89
+   Location 3: Graveyard - Rank: 3, Activity: 100.0%, Net Power: 128783.48
+   Location 4: Abandoned_Church - Rank: 4, Activity: 100.0%, Net Power: 126765.25
+   Location 5: Desert_Crossroads - Rank: 5, Activity: 100.0%, Net Power: 124261.56
+   Location 6: City_Alley - Rank: 6, Activity: 100.0%, Net Power: 122212.53
+
+    DynamoDB complex analytics: not executed
+    Observation: Client-side recreation would require fetching every soul partition
+    Attempted approach: loop over each location and soul, aggregate events and ledger entries in code
+    Limitation: number of partitions grows quickly, causing long runtimes and high query counts
+    (See commented prototype in scripts/demo.js for reference)
+
+PERFORMANCE ANALYSIS
+========================
+ DynamoDB batch operations: 30.818083ms for 10 items
+    Per-item cost: 3.1ms per contract
+    Scalability: Linear performance up to 100 items per batch
+ DSQL complex analytics: 577.2ms avg for business intelligence
+    Data processed: All contracts + events + ledger entries
+    Consistency: CV=17.8% (Excellent)
+    Scalability: Performance depends on data volume and query complexity
+
+SUMMARY & DECISION FRAMEWORK
+=================================
+DynamoDB: "The devil you know"
+    When to choose: User-facing apps, known access patterns, predictable load
+    Performance: Consistent 25-35ms for entity operations
+    Predictability: Low variability, reliable response times
+    Cost model: Pay per operation, predictable scaling
+    Sweet spot: Mobile apps, gaming, IoT, real-time applications
+
+DSQL: "The devil you don't"
+    When to choose: Analytics, evolving requirements, complex relationships
+    Performance: 30-50ms for analytics, variable for complex JOINs
+    Unpredictability: Can range from 30ms to 300ms+ (cold starts, query complexity)
+    Cost model: Pay for compute time, efficient for analytical workloads
+    Sweet spot: Business intelligence, reporting, data exploration
+
+THE VARIABILITY LESSON:
+    DynamoDB: Consistent performance you can architect around
+    DSQL: Variable performance requires defensive programming
+    This IS the philosophical difference - predictable vs flexible
+
+ARCHITECTURAL DECISION MATRIX:
+    User-facing latency critical? -> DynamoDB
+    Ad-hoc analytics required? -> DSQL
+    Access patterns well-defined? -> DynamoDB
+    Query flexibility needed? -> DSQL
+    Predictable costs important? -> DynamoDB
+    Complex calculations required? -> DSQL
+    Consistent response times critical? -> DynamoDB
+    Can handle variable performance? -> DSQL
+
+Remember: You can use BOTH in the same application!
+   - DynamoDB for user-facing operations
+   - DSQL for analytics and reporting
+   - Choose the right tool for each use case
