@@ -29,7 +29,7 @@ Both sides receive identical datasets via the setup/seeding workflow so demos an
 
 ```mermaid
 flowchart LR
-    subgraph Partition ["DynamoDB Partition (PK = SOUL#<soul_id>)"]
+    subgraph Partition ["DDB Partition (PK = SOUL#<soul_id>)"]
         Contract["SK = CONTRACT\nstatus, contract_location, soul_type, updated_at"]
         Events["SK = EVENT#<timestamp>\ndescription, timestamp"]
         Ledger["SK = LEDGER#<timestamp>\namount, timestamp, description"]
@@ -87,37 +87,25 @@ erDiagram
 
 ```mermaid
 flowchart LR
-    Developer[
-      Developer
-      laptop
-    ] -->|`sam deploy`
-    CloudFormation
+    Developer[Developer Laptop]
+    Developer -->|sam deploy| CloudFormation
 
-    CloudFormation --> LambdaDynamo[
-      Lambda: Dynamo Soul Tracker
-    ]
-    CloudFormation --> LambdaDsql[
-      Lambda: DSQL Soul Tracker
-    ]
-    CloudFormation --> APIGW[
-      API Gateway (Invoke Lambdas)
-    ]
-    CloudFormation --> DynamoTable[
-      DynamoDB Table:
-      DevilSoulTracker
-    ]
-    CloudFormation --> IAMRoles[
-      IAM Execution Roles
-    ]
+    CloudFormation --> LambdaDynamo[Lambda
+      "Dynamo Soul Tracker"]
+    CloudFormation --> LambdaDsql[Lambda
+      "DSQL Soul Tracker"]
+    CloudFormation --> APIGW[API Gateway]
+    CloudFormation --> DynamoTable[DynamoDB Table]
+    CloudFormation --> IAMRoles[IAM Roles]
 
-    subgraph Existing Resources (provision separately)
+    subgraph Existing Aurora Resources
         AuroraDSQL[(Aurora DSQL Cluster)]
     end
 
-    LambdaDynamo --> DynamoTable
-    LambdaDsql --> AuroraDSQL
     APIGW --> LambdaDynamo
     APIGW --> LambdaDsql
+    LambdaDynamo --> DynamoTable
+    LambdaDsql --> AuroraDSQL
 ```
 
 - CloudFormation (SAM) deploys API Gateway, both Lambdas, DynamoDB table, and IAM roles.
@@ -128,28 +116,18 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    BrowserUI[
-      Browser UI
-      (index.html)
-    ] -->|HTTP POST /api/run-script|
-    ExpressBFF[
-      Node server.js
-      (Express)
-    ]
-
-    ExpressBFF -->|spawn|
-    Scripts[
-      scripts/*.js
-      (demo, setup, benchmark...)
-    ]
-
-    Scripts -->|SDK calls|
+    BrowserUI[Browser UI
+    index.html]
+    ExpressBFF[server.js
+    Express BFF]
+    Scripts[scripts/*.js]
     AWS[(AWS Services)]
 
-    BrowserUI -->|poll/read|
-    ExpressBFF
-    ExpressBFF -->|streams output|
-    BrowserUI
+    BrowserUI -->|POST /api/run-script| ExpressBFF
+    ExpressBFF -->|spawn child process| Scripts
+    Scripts -->|SDK calls| AWS
+    Scripts -->|stdout/stderr| ExpressBFF
+    ExpressBFF -->|stream output| BrowserUI
 ```
 
 - `npm run server` starts Express on `localhost:3000`.
