@@ -126,7 +126,7 @@ class MainDemo {
     const soulId = await this.getSampleSoulId();
 
     // Scenario 1: Complete Soul Profile - Rigorous statistical testing
-    console.log('SCENARIO: Get complete soul profile (user-facing app)');
+    console.log('SCENARIO 1: Get complete soul profile (user-facing app)');
     console.log('  Goal: Retrieve soul contract + all events + total power in one operation');
     console.log("  Use case: Mobile app showing user's complete supernatural profile");
     
@@ -240,13 +240,20 @@ class MainDemo {
     console.log('');
 
     // Scenario 2: Analytics Query - Show both implementations
-    console.log('SCENARIO: Business analytics (executive dashboard)');
+    console.log('SCENARIO 2: Business analytics (executive dashboard)');
     console.log('    Goal: Analyze soul power distribution across all locations');
     console.log('    Use case: Executive dashboard showing business metrics\n');
     
     const analyticsStart = startTimer();
     // DSQL: Complex business analytics - executive dashboard query
     const analyticsResult = await this.dsqlClient.query(`
+      WITH ledger_totals AS (
+        SELECT
+          soul_contract_id,
+          SUM(amount) AS total_power_per_soul
+        FROM soul_ledger
+        GROUP BY soul_contract_id
+      )
       SELECT 
         sc.contract_location,                           -- Group results by location (crossroads, highway, etc.)
         
@@ -254,16 +261,16 @@ class MainDemo {
         COUNT(*) as soul_count,                         -- Total souls at this location
         COUNT(CASE WHEN sc.contract_status = 'Redeemed' THEN 1 END) as redeemed,  -- Conditional count: only redeemed souls
         
-        -- Power calculations with null handling
-        SUM(COALESCE(sl.amount, 0)) as total_power,     -- Total power at location (COALESCE handles nulls as 0)
-        AVG(COALESCE(sl.amount, 0)) as avg_power_per_soul,  -- Average power per soul at location
+        -- Power calculations with per-soul totals to match DynamoDB logic
+        SUM(COALESCE(lt.total_power_per_soul, 0)) as total_power,     -- Total power at location
+        AVG(COALESCE(lt.total_power_per_soul, 0)) as avg_power_per_soul,  -- Average power per soul
         
         -- Business metric: redemption rate as percentage
         ROUND(COUNT(CASE WHEN sc.contract_status = 'Redeemed' THEN 1 END) * 100.0 / COUNT(*), 1) as redemption_rate
         -- Formula: (redeemed_count / total_count) * 100, rounded to 1 decimal place
         
       FROM soul_contracts sc                            -- Main contracts table
-      LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id  -- Get power transactions (LEFT JOIN keeps souls with no power)
+      LEFT JOIN ledger_totals lt ON lt.soul_contract_id = sc.id
       
       GROUP BY sc.contract_location                     -- Aggregate by location
       ORDER BY total_power DESC                         -- Show highest power locations first
@@ -333,9 +340,9 @@ class MainDemo {
           }
         }
 
-        // Calculate derived metrics
-        locationData[location].avg_power_per_soul = locationData[location].soul_count > 0 
-          ? locationData[location].total_power / locationData[location].soul_count 
+        // Calculate derived metrics: average ledger power per soul and percentage redeemed.
+        locationData[location].avg_power_per_soul = locationData[location].soul_count > 0
+          ? locationData[location].total_power / locationData[location].soul_count
           : 0;
         locationData[location].redemption_rate = locationData[location].soul_count > 0
           ? (locationData[location].redeemed / locationData[location].soul_count) * 100
