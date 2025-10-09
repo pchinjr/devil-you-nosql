@@ -87,20 +87,21 @@ erDiagram
 
 ```mermaid
 flowchart LR
-    Developer[Developer Laptop]
+    Developer["Developer Laptop"]
+    CloudFormation["AWS SAM / CloudFormation"]
+    LambdaDynamo["Lambda: Dynamo Soul Tracker"]
+    LambdaDsql["Lambda: DSQL Soul Tracker"]
+    APIGW["API Gateway"]
+    DynamoTable["DynamoDB: DevilSoulTracker"]
+    IAMRoles["IAM Roles"]
+    AuroraDSQL[("Aurora DSQL Cluster")]
+
     Developer -->|sam deploy| CloudFormation
-
-    CloudFormation --> LambdaDynamo[Lambda
-      "Dynamo Soul Tracker"]
-    CloudFormation --> LambdaDsql[Lambda
-      "DSQL Soul Tracker"]
-    CloudFormation --> APIGW[API Gateway]
-    CloudFormation --> DynamoTable[DynamoDB Table]
-    CloudFormation --> IAMRoles[IAM Roles]
-
-    subgraph Existing Aurora Resources
-        AuroraDSQL[(Aurora DSQL Cluster)]
-    end
+    CloudFormation --> LambdaDynamo
+    CloudFormation --> LambdaDsql
+    CloudFormation --> APIGW
+    CloudFormation --> DynamoTable
+    CloudFormation --> IAMRoles
 
     APIGW --> LambdaDynamo
     APIGW --> LambdaDsql
@@ -116,12 +117,10 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    BrowserUI[Browser UI
-    index.html]
-    ExpressBFF[server.js
-    Express BFF]
-    Scripts[scripts/*.js]
-    AWS[(AWS Services)]
+    BrowserUI["Browser UI (index.html)"]
+    ExpressBFF["BFF (server.js + Express)"]
+    Scripts["Local scripts (demo.js, benchmark.js, ...)"]
+    AWS[("AWS Services")]
 
     BrowserUI -->|POST /api/run-script| ExpressBFF
     ExpressBFF -->|spawn child process| Scripts
