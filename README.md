@@ -28,20 +28,16 @@ Both sides receive identical datasets via the setup/seeding workflow so demos an
 ### DynamoDB Single-Table Layout
 
 ```mermaid
-erDiagram
-    DEVILSOULTRACKER ||..|| GSI1 : "GSI1PK/GSI1SK"
-    DEVILSOULTRACKER {
-        string PK "SOUL#<soul_id>"
-        string SK "CONTRACT | EVENT#ts | LEDGER#ts"
-        string status
-        string contract_location
-        string soul_type
-        number amount
-        string timestamp
-        string description
-        string GSI1PK
-        string GSI1SK
-    }
+flowchart LR
+    subgraph Partition ["DynamoDB Partition (PK = SOUL#<soul_id>)"]
+        Contract["SK = CONTRACT\nstatus, contract_location, soul_type, updated_at"]
+        Events["SK = EVENT#<timestamp>\ndescription, timestamp"]
+        Ledger["SK = LEDGER#<timestamp>\namount, timestamp, description"]
+    end
+
+    Contract -->|Projects| GSI["GSI1PK = STATUS#<status>\nGSI1SK = <timestamp>"]
+    Events -->|Projects| GSI
+    Ledger -->|Projects| GSI
 ```
 
 - All records for a soul share the same `PK` (`SOUL#<id>`).
