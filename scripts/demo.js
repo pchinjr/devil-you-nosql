@@ -358,7 +358,7 @@ class MainDemo {
       .sort(([,a], [,b]) => b.total_power - a.total_power);
 
     console.log(`    Completed in ${dynamoAnalyticsTime}ms using ${totalDynamoQueries} separate queries`);
-    console.log(`    Analyzed ${sortedLocations.length} locations (same result as DSQL)`);
+    console.log(`    Analyzed ${sortedLocations.length} locations`);
     console.log('    How: Multiple GSI queries + client-side aggregation + sorting');
     console.log('    Complexity: N+M queries (N locations + M souls) + application logic');
     console.log(`    Cost: ${totalDynamoQueries} read operations vs 1 DSQL query`);
@@ -371,7 +371,7 @@ class MainDemo {
       console.log(`   Location ${i + 1}: ${row.contract_location} - ${row.soul_count} souls, ${row.redeemed} redeemed (${row.redemption_rate}%), Power: ${row.total_power}`);
     });
     
-    console.log('DynamoDB Equivalent (requires client processing):');
+    console.log('DynamoDB Equivalent (required client processing):');
     sortedLocations.forEach(([location, data], i) => {
       console.log(`   Location ${i + 1}: ${location} - ${data.soul_count} souls, ${data.redeemed} redeemed (${data.redemption_rate.toFixed(1)}%), Power: ${data.total_power}`);
     });
@@ -382,11 +382,7 @@ class MainDemo {
   }
 
   async demonstrateWriteOperations() {
-    console.log('WRITE OPERATIONS DEMONSTRATION');
-    console.log('==================================');
-    console.log('Testing transaction performance with direct database calls\n');
-
-    console.log('SCENARIO: Soul contract status update (transaction scenario)');
+    console.log('SCENARIO 3: Soul contract status update (transaction scenario)');
     console.log('    Goal: Update contract status + add event + update ledger');
     console.log('    Use case: Ghost Rider completing a soul redemption\n');
 
@@ -400,6 +396,7 @@ class MainDemo {
     // Test DynamoDB transaction
     console.log('DynamoDB Transaction:');
     const dynamoWriteStart = startTimer();
+    let dynamoWriteTime = null;
     try {
       // DynamoDB: Single atomic transaction across multiple items in same partition
       await dynamodb.send(new TransactWriteCommand({
@@ -448,7 +445,7 @@ class MainDemo {
         ]
       }));
       
-      const dynamoWriteTime = elapsedMs(dynamoWriteStart);
+      dynamoWriteTime = elapsedMs(dynamoWriteStart);
       console.log(`   Transaction completed in ${dynamoWriteTime}ms`);
       console.log('   How: TransactWrite with 3 operations (1 update + 2 inserts)');
       console.log('   Operations: Contract status updated, event logged, ledger entry added');
@@ -481,6 +478,7 @@ class MainDemo {
     // Test DSQL transaction
     console.log('\nDSQL Transaction:');
     const dsqlWriteStart = startTimer();
+    let dsqlWriteTime = null;
     try {
       // DSQL: Full ACID transaction across multiple normalized tables
       await this.dsqlClient.query('BEGIN');  // Start transaction
@@ -507,7 +505,7 @@ class MainDemo {
       
       await this.dsqlClient.query('COMMIT');  // Commit all changes atomically
       
-      const dsqlWriteTime = elapsedMs(dsqlWriteStart);
+      dsqlWriteTime = elapsedMs(dsqlWriteStart);
       console.log(`   Transaction completed in ${dsqlWriteTime}ms`);
       console.log('   How: SQL transaction with BEGIN/COMMIT across 3 normalized tables');
       console.log('   Operations: Contract updated, event inserted, ledger entry inserted');
@@ -565,24 +563,36 @@ class MainDemo {
       }
     }
 
-    console.log('\nWRITE OPERATIONS ANALYSIS:');
-    console.log('DynamoDB Transactions:');
-    console.log('  Predictable latency (typically 20-50ms) even under sustained load');
-    console.log('  Strong consistency within a partition because items share the same physical shard');
-    console.log('  Atomic operations permitted for up to 100 items or 4 MB payload');
-    console.log('  Limitation: Multi-partition writes require eventual consistency patterns');
-    console.log('  Best fit: Real-time device state, session data, or any workload co-locating data on one partition key');
-    console.log('DSQL Transactions:');
-    console.log('  Full ACID compliance across any tables, views, or constraints');
-    console.log('  Supports complex SQL logic, triggers, generated columns, and foreign keys');
-    console.log('  Automatic rollback keeps data consistent when a step fails');
-    console.log('  Latency varies with query plans and contention (20-200ms+)');
-    console.log('  Best fit: Financial ledgers, order management, or workflows spanning multiple entities');
+    console.log('\nWRITE OPERATIONS STATISTICAL SUMMARY:');
+    if (dynamoWriteTime !== null) {
+      console.log(`  DynamoDB observed time: ${dynamoWriteTime.toFixed(2)}ms`);
+    } else {
+      console.log('  DynamoDB observed time: unavailable (transaction failed)');
+    }
+
+    if (dsqlWriteTime !== null) {
+      console.log(`  DSQL observed time: ${dsqlWriteTime.toFixed(2)}ms`);
+    } else {
+      console.log('  DSQL observed time: unavailable (transaction failed)');
+    }
+
+    if (dynamoWriteTime !== null && dsqlWriteTime !== null) {
+      const ratio = dsqlWriteTime / dynamoWriteTime;
+      const delta = dsqlWriteTime - dynamoWriteTime;
+      console.log(`  Relative gap: ${ratio.toFixed(2)}x slower on DSQL (${delta.toFixed(2)}ms difference)`);
+    } else {
+      console.log('  Relative gap: cannot compute (insufficient data)');
+    }
 
     console.log('\nWRITE OPERATIONS INSIGHTS:');
-    console.log('  DynamoDB: Choose when you need relentless write throughput and you can model around partition boundaries.');
-    console.log('  DSQL: Choose when transactional semantics, relational integrity, or SQL guardrails matter more than raw speed.');
-    console.log('  Hybrid tip: Capture the initial write in the system optimized for that workload and stream updates to the other service for secondary use cases.');
+    console.log('  DynamoDB measurement reflects a partition-local TransactWrite (1 update + 2 inserts).');
+    console.log('  DSQL measurement captures a BEGIN/COMMIT that touches three normalized tables with IAM-authenticated connection.');
+    if (dynamoWriteTime !== null && dsqlWriteTime !== null) {
+      const faster = dynamoWriteTime <= dsqlWriteTime ? 'DynamoDB' : 'DSQL';
+      console.log(`  Demonstrated outcome: ${faster} completed faster in this run. Re-run the demo to gather additional samples for a fuller distribution.`);
+    } else {
+      console.log('  Demonstrated outcome: at least one transaction failed; rerun the demo once connectivity issues are resolved.');
+    }
     console.log('');
   }
 
@@ -645,6 +655,7 @@ class MainDemo {
       [soulIds]
     );
     const dsqlInTime = elapsedMs(dsqlInStart);
+    this.dsqlBatchRows = dsqlInResult.rows;
 
     console.log(`    DSQL IN clause: ${dsqlInTime}ms for ${keys.length} contracts`);
     console.log(`    How: Single query with ANY($1::text[]) - proper SQL batching`);
@@ -681,6 +692,12 @@ class MainDemo {
     sampleContracts.forEach((contract, i) => {
       console.log(`   Contract ${i + 1}: ${contract.soulId} - ${contract.status} at ${contract.contract_location}`);
     });
+    if (this.dsqlBatchRows && this.dsqlBatchRows.length) {
+      console.log('DSQL Batch result (normalized rows):');
+      this.dsqlBatchRows.forEach((row, i) => {
+        console.log(`   Contract ${i + 1}: ${row.id} - ${row.contract_status} at ${row.contract_location}`);
+      });
+    }
     console.log('');
 
     // DSQL Strength: Complex Queries with statistical analysis
@@ -742,17 +759,23 @@ class MainDemo {
     console.log('    Features: Multi-level aggregation, ranking, percentage calculations');
     console.log(`    Statistics: P95=${complexStats.p95.toFixed(1)}ms, CV=${complexStats.cv.toFixed(1)}%`);
     console.log('    Business value: Risk analysis, profitability ranking, activity metrics');
-    console.log('    DynamoDB equivalent: Impossible without extensive client-side processing');
-    console.log('    Alternative: Would require scanning entire table + complex application logic');
+    console.log('    Observation: SQL engine performs multi-table aggregation in one pass');
     
     // Show complex analytics results
     console.log('\nCOMPLEX ANALYTICS RESULTS FOR FRONTEND:');
-    console.log('Risk Analysis Dashboard Data:');
+    console.log('Risk Analysis Dashboard Data (DSQL):');
     if (complexResult && complexResult.rows) {
       complexResult.rows.forEach((row, i) => {
         console.log(`   Location ${i + 1}: ${row.contract_location} - Rank: ${row.profitability_rank}, Activity: ${row.activity_rate}%, Net Power: ${row.avg_net_power}`);
       });
     }
+    console.log('');
+
+    console.log('    DynamoDB complex analytics: not executed');
+    console.log('    Observation: Client-side recreation would require fetching every soul partition');
+    console.log('    Attempted approach: loop over each location and soul, aggregate events and ledger entries in code');
+    console.log('    Limitation: number of partitions grows quickly, causing long runtimes and high query counts');
+    console.log('    (See commented prototype in scripts/demo.js for reference)');
     console.log('');
 
     console.log('PERFORMANCE ANALYSIS');
