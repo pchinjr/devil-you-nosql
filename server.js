@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const { exec } = require('child_process');
 const path = require('path');
@@ -25,8 +26,7 @@ app.post('/api/run-script', (req, res) => {
   const allowedScripts = [
     'setup.js',
     'demo.js',
-    'seedSmall.js',
-    'seedLarge.js',
+    'seedData.js',
     'verifyDatabases.js',
     'validate.js'
   ];

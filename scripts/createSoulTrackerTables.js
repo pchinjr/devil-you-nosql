@@ -16,6 +16,7 @@
  *   node createSoulTrackerTables.js
  */
 
+require('dotenv').config();
 const { DsqlSigner } = require("@aws-sdk/dsql-signer");
 const { Client } = require("pg");
 const { performance } = require("perf_hooks");

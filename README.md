@@ -51,8 +51,7 @@ devil-you-nosql/
 ├── scripts/
 │   ├── setup.js                        # 🚀 Complete setup and verification
 │   ├── demo.js                         # 🎭 Main philosophy demonstration with statistical analysis
-│   ├── seedSmall.js                    # 🌱 Small dataset seeding (10 souls)
-│   ├── seedLarge.js                    # 🌱 Large dataset seeding (1,000+ souls)
+│   ├── seedData.js                     # 🌱 Configurable dataset seeding (small or large)
 │   ├── verifyDatabases.js              # 🔧 Database connectivity verification
 │   ├── validate.js                     # ✅ Data consistency validation
 │   ├── createSoulTrackerTables.js      # Create soul-contract tables in Aurora DSQL

@@ -1,4 +1,5 @@
 // src/dynamoSoulTracker.ts
+import "dotenv/config";
 import { APIGatewayProxyHandler } from "aws-lambda";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+require('dotenv').config();
 const { DynamoDBClient, QueryCommand, ScanCommand } = require('@aws-sdk/client-dynamodb');
 const { DsqlSigner } = require('@aws-sdk/dsql-signer');
 const { Client } = require('pg');

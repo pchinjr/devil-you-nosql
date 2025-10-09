@@ -1,5 +1,6 @@
 // src/dsqlSoulContract.ts
 
+import "dotenv/config";
 import { DsqlSigner } from "@aws-sdk/dsql-signer";
 import { Client } from "pg";
 import { APIGatewayProxyHandler } from "aws-lambda";

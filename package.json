@@ -9,7 +9,10 @@
     "start": "node build/index.js",
     "setup": "node scripts/setup.js",
     "demo": "node scripts/demo.js",
-    "seed": "node scripts/seedSmall.js",
+    "benchmark": "node scripts/benchmark.js",
+    "seed": "npm run seed:small",
+    "seed:small": "node scripts/seedData.js --souls 10 --events 10 --ledger 50",
+    "seed:large": "node scripts/seedData.js --souls 1000 --events 50 --ledger 5000",
     "verify": "node scripts/verifyDatabases.js",
     "server": "node server.js"
   },
@@ -24,6 +27,7 @@
     "@aws-sdk/dsql-signer": "^3.782.0",
     "@aws-sdk/lib-dynamodb": "^3.257.0",
     "@aws-sdk/util-format-url": "^3.775.0",
+    "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "pg": "^8.14.1",
     "uuid": "^9.0.0"

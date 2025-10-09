@@ -4,6 +4,7 @@
  * Required after SAM deployment to create DSQL tables and indexes
  */
 
+require('dotenv').config();
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
@@ -29,7 +30,7 @@ async function runSetup() {
     console.log('✅ DSQL indexes created\n');
 
     console.log('🌱 Step 4: Seeding sample data...');
-    await execAsync('node scripts/seedSmall.js');
+    await execAsync('node scripts/seedData.js --souls 10 --events 10 --ledger 50');
     console.log('✅ Sample data seeded\n');
 
     console.log('✅ Step 5: Validating setup...');

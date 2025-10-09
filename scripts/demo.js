@@ -4,6 +4,7 @@
  * Showcases the core philosophy and natural strengths of each database
  */
 
+require('dotenv').config();
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, GetCommand, QueryCommand, BatchGetCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
 const { DsqlSigner } = require("@aws-sdk/dsql-signer");
@@ -91,11 +92,6 @@ class MainDemo {
 
     const soulId = await this.getSampleSoulId();
 
-    // Scenario 1: Complete Soul Profile
-    console.log('📋 SCENARIO: Get complete soul profile (user-facing app)');
-    console.log('   🎯 Goal: Retrieve soul contract + all events + total power in one operation');
-    console.log('   📱 Use case: Mobile app showing user\'s complete supernatural profile\n');
-    
     // Scenario 1: Complete Soul Profile - Rigorous statistical testing
     console.log('📋 SCENARIO: Get complete soul profile (user-facing app)');
     console.log('   🎯 Goal: Retrieve soul contract + all events + total power in one operation');
@@ -117,15 +113,18 @@ class MainDemo {
       dynamoTimes.push(dynamoTime);
 
       const dsqlStart = process.hrtime.bigint();
+      // DSQL: Single query with JOINs and aggregation - database does the work
       const dsqlResult = await this.dsqlClient.query(`
-        SELECT sc.*, 
-               array_agg(sce.description) as events,
-               sum(sl.amount) as total_power
-        FROM soul_contracts sc
-        LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id  
-        LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
-        WHERE sc.id = $1
+        SELECT sc.*,                                    -- All contract fields (id, status, type, location, etc.)
+               array_agg(sce.description) as events,   -- Collect all event descriptions into an array
+               sum(sl.amount) as total_power            -- Calculate total power from all ledger entries
+        FROM soul_contracts sc                          -- Main table: soul contracts
+        LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id   -- Get all events for this soul
+        LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id              -- Get all power transactions
+        WHERE sc.id = $1                               -- Filter to specific soul ID
         GROUP BY sc.id, sc.contract_status, sc.soul_type, sc.contract_location, sc.updated_at
+        -- GROUP BY required because we're using aggregation functions (array_agg, sum)
+        -- Must include all non-aggregated SELECT columns in GROUP BY
       `, [soulId]);
       const dsqlTime = Number(process.hrtime.bigint() - dsqlStart) / 1000000;
       dsqlTimes.push(dsqlTime);
@@ -173,7 +172,7 @@ class MainDemo {
     // Show sample data that frontend would receive
     console.log('\n📋 SAMPLE DATA RETURNED TO FRONTEND:');
     console.log('🔥 DynamoDB Items (raw single-table format):');
-    this.dynamoSampleData.slice(0, 2).forEach((item, i) => {
+    this.dynamoSampleData.forEach((item, i) => {
       console.log(`   Item ${i + 1}: ${item.SK} - ${item.soulId || 'N/A'} (${item.description || item.contract_status || item.amount || 'contract'})`);
     });
     
@@ -189,18 +188,29 @@ class MainDemo {
     console.log('   💼 Use case: Executive dashboard showing business metrics\n');
     
     const analyticsStart = Date.now();
+    // DSQL: Complex business analytics - executive dashboard query
     const analyticsResult = await this.dsqlClient.query(`
       SELECT 
-        sc.contract_location,
-        COUNT(*) as soul_count,
-        COUNT(CASE WHEN sc.contract_status = 'Redeemed' THEN 1 END) as redeemed,
-        SUM(COALESCE(sl.amount, 0)) as total_power,
-        AVG(COALESCE(sl.amount, 0)) as avg_power_per_soul,
+        sc.contract_location,                           -- Group results by location (crossroads, highway, etc.)
+        
+        -- Basic counts and statistics
+        COUNT(*) as soul_count,                         -- Total souls at this location
+        COUNT(CASE WHEN sc.contract_status = 'Redeemed' THEN 1 END) as redeemed,  -- Conditional count: only redeemed souls
+        
+        -- Power calculations with null handling
+        SUM(COALESCE(sl.amount, 0)) as total_power,     -- Total power at location (COALESCE handles nulls as 0)
+        AVG(COALESCE(sl.amount, 0)) as avg_power_per_soul,  -- Average power per soul at location
+        
+        -- Business metric: redemption rate as percentage
         ROUND(COUNT(CASE WHEN sc.contract_status = 'Redeemed' THEN 1 END) * 100.0 / COUNT(*), 1) as redemption_rate
-      FROM soul_contracts sc
-      LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
-      GROUP BY sc.contract_location
-      ORDER BY total_power DESC
+        -- Formula: (redeemed_count / total_count) * 100, rounded to 1 decimal place
+        
+      FROM soul_contracts sc                            -- Main contracts table
+      LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id  -- Get power transactions (LEFT JOIN keeps souls with no power)
+      
+      GROUP BY sc.contract_location                     -- Aggregate by location
+      ORDER BY total_power DESC                         -- Show highest power locations first
+      -- This single query replaces 35+ separate DynamoDB queries + client-side calculations
     `);
     const analyticsTime = Date.now() - analyticsStart;
 
@@ -293,12 +303,12 @@ class MainDemo {
     // Show analytics results that frontend would receive
     console.log('\n📊 ANALYTICS RESULTS FOR FRONTEND:');
     console.log('⚡ DSQL Business Intelligence (ready for dashboard):');
-    analyticsResult.rows.slice(0, 3).forEach((row, i) => {
+    analyticsResult.rows.forEach((row, i) => {
       console.log(`   Location ${i + 1}: ${row.contract_location} - ${row.soul_count} souls, ${row.redeemed} redeemed (${row.redemption_rate}%), Power: ${row.total_power}`);
     });
     
     console.log('🔥 DynamoDB Equivalent (requires client processing):');
-    sortedLocations.slice(0, 3).forEach(([location, data], i) => {
+    sortedLocations.forEach(([location, data], i) => {
       console.log(`   Location ${i + 1}: ${location} - ${data.soul_count} souls, ${data.redeemed} redeemed (${data.redemption_rate.toFixed(1)}%), Power: ${data.total_power}`);
     });
     console.log('');
@@ -316,49 +326,58 @@ class MainDemo {
     console.log('   🎯 Goal: Update contract status + add event + update ledger');
     console.log('   💼 Use case: Ghost Rider completing a soul redemption\n');
 
-    const soulId = 'murderer_highway_66_009';
+    // Get a valid soul ID from the database instead of hardcoding
+    const soulId = await this.getSampleSoulId();
     const newStatus = 'Redeemed';
     const amount = 500;
     const eventDescription = 'Soul redeemed by Ghost Rider';
+    const currentTime = new Date().toISOString();
 
     // Test DynamoDB transaction
     console.log('🔥 DynamoDB Transaction:');
     const dynamoWriteStart = Date.now();
     try {
+      // DynamoDB: Single atomic transaction across multiple items in same partition
       await dynamodb.send(new TransactWriteCommand({
         TransactItems: [
           {
+            // Operation 1: Update the main contract status
             Update: {
               TableName: TABLE_NAME,
-              Key: { PK: `SOUL#${soulId}`, SK: 'CONTRACT' },
+              Key: { 
+                PK: `SOUL#${soulId}`,     // Partition key: groups all soul data
+                SK: 'CONTRACT'            // Sort key: identifies the main contract record
+              },
               UpdateExpression: 'SET #status = :status, updated_at = :timestamp',
-              ExpressionAttributeNames: { '#status': 'status' },
+              ExpressionAttributeNames: { '#status': 'status' },  // 'status' is reserved word
               ExpressionAttributeValues: { 
                 ':status': newStatus,
-                ':timestamp': new Date().toISOString()
+                ':timestamp': currentTime
               }
             }
           },
           {
+            // Operation 2: Add new event record
             Put: {
               TableName: TABLE_NAME,
               Item: {
-                PK: `SOUL#${soulId}`,
-                SK: `EVENT#${new Date().toISOString()}`,
+                PK: `SOUL#${soulId}`,                    // Same partition as contract
+                SK: `EVENT#${currentTime}`,              // Sort key: chronological ordering
                 description: eventDescription,
-                timestamp: new Date().toISOString()
+                timestamp: currentTime
               }
             }
           },
           {
+            // Operation 3: Add new ledger entry for power transaction
             Put: {
               TableName: TABLE_NAME,
               Item: {
-                PK: `SOUL#${soulId}`,
-                SK: `LEDGER#${new Date().toISOString()}`,
+                PK: `SOUL#${soulId}`,                    // Same partition as contract
+                SK: `LEDGER#${currentTime}`,             // Sort key: chronological ordering
                 amount: amount,
                 transaction_type: 'redemption',
-                timestamp: new Date().toISOString()
+                timestamp: currentTime
               }
             }
           }
@@ -369,7 +388,8 @@ class MainDemo {
       console.log(`   ✅ Transaction completed in ${dynamoWriteTime}ms`);
       console.log(`   🔧 How: TransactWrite with 3 operations (1 update + 2 inserts)`);
       console.log(`   📊 Operations: Contract status updated, event logged, ledger entry added`);
-      console.log(`   💡 ACID: Strong consistency within partition`);
+      console.log(`   💡 ACID: Strong consistency within partition (all items share PK)`);
+      console.log(`   🎯 Constraint: All operations must be in same partition for ACID guarantees`);
     } catch (error) {
       console.log(`   ❌ DynamoDB transaction failed: ${error.message}`);
     }
@@ -378,37 +398,41 @@ class MainDemo {
     console.log('\n⚡ DSQL Transaction:');
     const dsqlWriteStart = Date.now();
     try {
-      await this.dsqlClient.query('BEGIN');
+      // DSQL: Full ACID transaction across multiple normalized tables
+      await this.dsqlClient.query('BEGIN');  // Start transaction
       
-      // Update contract status
+      // Operation 1: Update contract status in main table
       await this.dsqlClient.query(
         'UPDATE soul_contracts SET contract_status = $1, updated_at = $2 WHERE id = $3',
-        [newStatus, new Date().toISOString(), soulId]
+        [newStatus, currentTime, soulId]
       );
       
-      // Add event
+      // Operation 2: Insert event record in events table
+      // Note: Using 'event_time' column name (not 'timestamp' - that was the bug!)
       await this.dsqlClient.query(
-        'INSERT INTO soul_contract_events (soul_contract_id, description, timestamp) VALUES ($1, $2, $3)',
-        [soulId, eventDescription, new Date().toISOString()]
+        'INSERT INTO soul_contract_events (soul_contract_id, description, event_time) VALUES ($1, $2, $3)',
+        [soulId, eventDescription, currentTime]
       );
       
-      // Add ledger entry
+      // Operation 3: Insert ledger entry in ledger table  
+      // Note: Using 'transaction_time' column name (not 'timestamp')
       await this.dsqlClient.query(
-        'INSERT INTO soul_ledger (soul_contract_id, amount, transaction_type, timestamp) VALUES ($1, $2, $3, $4)',
-        [soulId, amount, 'redemption', new Date().toISOString()]
+        'INSERT INTO soul_ledger (soul_contract_id, amount, transaction_time, description) VALUES ($1, $2, $3, $4)',
+        [soulId, amount, currentTime, `Redemption power bonus: ${amount}`]
       );
       
-      await this.dsqlClient.query('COMMIT');
+      await this.dsqlClient.query('COMMIT');  // Commit all changes atomically
       
       const dsqlWriteTime = Date.now() - dsqlWriteStart;
       console.log(`   ✅ Transaction completed in ${dsqlWriteTime}ms`);
-      console.log(`   🔧 How: SQL transaction with BEGIN/COMMIT across 3 tables`);
+      console.log(`   🔧 How: SQL transaction with BEGIN/COMMIT across 3 normalized tables`);
       console.log(`   📊 Operations: Contract updated, event inserted, ledger entry inserted`);
-      console.log(`   💡 ACID: Full transaction isolation across tables`);
+      console.log(`   💡 ACID: Full transaction isolation across any tables (not limited by partitions)`);
+      console.log(`   🎯 Flexibility: Can include complex business logic, joins, constraints`);
     } catch (error) {
       console.log(`   ❌ DSQL transaction failed: ${error.message}`);
       try {
-        await this.dsqlClient.query('ROLLBACK');
+        await this.dsqlClient.query('ROLLBACK');  // Rollback on failure
         console.log('   🔄 Transaction rolled back successfully');
       } catch (rollbackError) {
         console.log('   ⚠️ Rollback also failed');
@@ -421,7 +445,6 @@ class MainDemo {
     console.log('   ✅ Strong consistency within partition');
     console.log('   ✅ Atomic operations up to 100 items');
     console.log('   ⚠️ Limited to single partition for transactions');
-    
     console.log('⚡ DSQL Transactions:');
     console.log('   ✅ Full ACID compliance across tables');
     console.log('   ✅ Complex transaction logic with SQL');
@@ -526,7 +549,7 @@ class MainDemo {
     // Show batch results that frontend would receive
     console.log('\n🔥 BATCH OPERATION RESULTS FOR FRONTEND:');
     console.log('📦 Sample contracts retrieved:');
-    const sampleContracts = this.batchResult.Responses[TABLE_NAME].slice(0, 3);
+    const sampleContracts = this.batchResult.Responses[TABLE_NAME];
     sampleContracts.forEach((contract, i) => {
       console.log(`   Contract ${i + 1}: ${contract.soulId} - ${contract.status} at ${contract.contract_location}`);
     });
@@ -598,7 +621,7 @@ class MainDemo {
     console.log('\n📈 COMPLEX ANALYTICS RESULTS FOR FRONTEND:');
     console.log('🎯 Risk Analysis Dashboard Data:');
     if (complexResult && complexResult.rows) {
-      complexResult.rows.slice(0, 3).forEach((row, i) => {
+      complexResult.rows.forEach((row, i) => {
         console.log(`   Location ${i + 1}: ${row.contract_location} - Rank: ${row.profitability_rank}, Activity: ${row.activity_rate}%, Net Power: ${row.avg_net_power}`);
       });
     }
@@ -721,17 +744,36 @@ class MainDemo {
   }
 
   async getSampleSoulId() {
-    const result = await dynamodb.send(new QueryCommand({
+    // Get a soul ID that exists in both databases
+    const dynamoResult = await dynamodb.send(new QueryCommand({
       TableName: TABLE_NAME,
       IndexName: 'StatusIndex',
       KeyConditionExpression: '#status = :status',
       ExpressionAttributeNames: { '#status': 'status' },
       ExpressionAttributeValues: { ':status': 'Bound' },
-      Limit: 1
+      Limit: 10  // Get multiple to find one that exists in both
     }));
     
-    if (result.Items.length === 0) throw new Error('No sample data found');
-    return result.Items[0].soulId;
+    if (dynamoResult.Items.length === 0) throw new Error('No sample data found in DynamoDB');
+    
+    // Check which souls exist in DSQL
+    for (const item of dynamoResult.Items) {
+      const soulId = item.soulId;
+      try {
+        const dsqlCheck = await this.dsqlClient.query('SELECT id FROM soul_contracts WHERE id = $1', [soulId]);
+        if (dsqlCheck.rows.length > 0) {
+          return soulId;  // Found a soul that exists in both databases
+        }
+      } catch (error) {
+        // Continue to next soul if this one fails
+        continue;
+      }
+    }
+    
+    // If no matching soul found, just return the first DynamoDB soul
+    // This will demonstrate the data consistency issue
+    console.log('   ⚠️ Warning: Using soul that may not exist in DSQL (data consistency issue)');
+    return dynamoResult.Items[0].soulId;
   }
 
   async getMultipleSoulIds(count) {

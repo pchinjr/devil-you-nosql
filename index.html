@@ -724,7 +724,7 @@
         }
 
         async function seedData() {
-            await executeScript('seedSmall.js');
+            await executeScript('seedData.js', ['--souls', '10', '--events', '10', '--ledger', '50']);
         }
 
         async function verifyDatabases() {

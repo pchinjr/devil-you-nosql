@@ -9,6 +9,7 @@
  *   node scripts/createDsqlIndexes.js
  */
 
+require('dotenv').config();
 const { DsqlSigner } = require("@aws-sdk/dsql-signer");
 const { Client }      = require("pg");
 
