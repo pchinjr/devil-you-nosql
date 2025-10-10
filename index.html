@@ -641,7 +641,7 @@
         async function runBenchmarkSuite() {
             const input = document.getElementById('benchmarkIterations');
             const iterations = Math.max(1, parseInt(input?.value, 10) || 50);
-            await executeScript('rigorousContrastBenchmark.js', [iterations.toString()]);
+            await executeScript('benchmark.js', [iterations.toString()]);
         }
 
         // Core functions
