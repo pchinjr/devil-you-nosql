@@ -702,7 +702,7 @@ class MainDemo {
 
     // DSQL Strength: Complex Queries with statistical analysis
     console.log('DSQL STRENGTH: Complex Business Logic');
-    console.log('    Scenario: Advanced analytics with business rules');
+    console.log('    Scenario 5: Advanced analytics with business rules');
     console.log('    Use case: Risk analysis for soul contract portfolio');
     console.log('    Testing: Statistical performance analysis\n');
     
