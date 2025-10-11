@@ -602,7 +602,7 @@ class MainDemo {
 
     // DynamoDB Strength: Batch Operations with detailed comparison
     console.log('DYNAMODB STRENGTH: Batch Operations');
-    console.log('    Scenario: Retrieve multiple soul contracts for dashboard list');
+    console.log('    Scenario 4: Retrieve multiple soul contracts for dashboard list');
     console.log('    Use case: Admin panel showing 10 recent contracts');
     console.log('    Testing: Compare batch vs individual operations\n');
     
@@ -640,7 +640,7 @@ class MainDemo {
     }
     const individualTime = elapsedMs(individualStart);
 
-    console.log(`     Individual queries: ${individualTime}ms for ${keys.length} contracts`);
+    console.log(`    Individual queries: ${individualTime}ms for ${keys.length} contracts`);
     console.log(`    Per-item cost: ${(individualTime/keys.length).toFixed(1)}ms per contract`);
     console.log(`    Network overhead: ${keys.length} round-trips vs 1 batch call`);
     console.log(`    Efficiency gain: ${(individualTime/batchTime).toFixed(1)}x faster with batching\n`);
