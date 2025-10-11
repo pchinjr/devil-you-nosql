@@ -122,22 +122,35 @@
             margin-bottom: 20px;
         }
 
-        .benchmark-controls {
+        .benchmark-group {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 18px;
-            margin: 20px 0 26px;
+            margin: 16px 0;
             flex-wrap: wrap;
+            background: rgba(20, 16, 12, 0.55);
+            border-radius: 12px;
+            padding: 18px 20px;
+            border: 1px solid rgba(255, 120, 0, 0.18);
         }
 
-        .benchmark-controls label {
+        .benchmark-field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 220px;
+        }
+
+        .benchmark-field label {
             font-weight: 600;
             color: #ffb347;
             text-transform: uppercase;
             letter-spacing: 1px;
+            font-size: 13px;
         }
 
-        .benchmark-controls input {
+        .benchmark-field input {
             width: 120px;
             padding: 10px 14px;
             border: none;
@@ -145,6 +158,26 @@
             background: rgba(255, 255, 255, 0.16);
             color: #ffecd1;
             font-size: 14px;
+        }
+
+        .benchmark-field select {
+            min-width: 220px;
+            padding: 10px 36px 10px 14px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.16);
+            color: #ffecd1;
+            font-size: 14px;
+            appearance: none;
+            position: relative;
+            background-image:
+                linear-gradient(45deg, transparent 50%, rgba(255, 236, 209, 0.9) 50%),
+                linear-gradient(135deg, rgba(255, 236, 209, 0.9) 50%, transparent 50%);
+            background-position:
+                calc(100% - 22px) calc(50% - 5px),
+                calc(100% - 16px) calc(50% - 5px);
+            background-size: 6px 6px;
+            background-repeat: no-repeat;
         }
 
         .btn {
@@ -324,13 +357,26 @@
         <div id="benchmark" class="tab-content">
             <h3>📊 Benchmark Suite</h3>
             <p style="margin-bottom:18px;color:rgba(255,215,180,0.75);">Light the fuse on full benchmarks to compare DynamoDB and Aurora DSQL across battle-tested workloads.</p>
-            <div class="benchmark-controls">
-                <label for="benchmarkIterations">Iterations per scenario</label>
-                <input type="number" id="benchmarkIterations" min="1" value="50">
+            <div class="benchmark-group">
+                <div class="benchmark-field">
+                    <label for="scenarioSelect">Scenario</label>
+                    <select id="scenarioSelect">
+                        <option value="">Full demo (all scenarios)</option>
+                        <option value="scenario1">Scenario 1 – Complete soul profile</option>
+                        <option value="scenario2">Scenario 2 – Business analytics</option>
+                        <option value="scenario3">Scenario 3 – Soul redemption transaction</option>
+                        <option value="scenario4">Scenario 4 – Batch operations</option>
+                        <option value="scenario5">Scenario 5 – Advanced analytics</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="runDemo()">Execute Scenario</button>
             </div>
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="runDemo()">Run Showcase Demo</button>
-                <button class="btn btn-secondary" onclick="runBenchmarkSuite()">Run Benchmark Suite</button>
+            <div class="benchmark-group">
+                <div class="benchmark-field">
+                    <label for="benchmarkIterations">Iterations per scenario</label>
+                    <input type="number" id="benchmarkIterations" min="1" value="50">
+                </div>
+                <button class="btn btn-secondary" onclick="runBenchmarkSuite()">Run Benchmark Iterations</button>
             </div>
         </div>
 
@@ -650,7 +696,15 @@
         }
 
         async function runDemo() {
-            await executeScript('demo.js');
+            const scenarioSelect = document.getElementById('scenarioSelect');
+            const scenario = scenarioSelect ? scenarioSelect.value : '';
+            const args = [];
+
+            if (scenario) {
+                args.push(scenario);
+            }
+
+            await executeScript('demo.js', args);
         }
 
         async function seedData() {

@@ -67,6 +67,69 @@ class MainDemo {
     await this.dsqlClient.end();
   }
 
+  async runScenario(scenarioKey) {
+    const normalized = (scenarioKey || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const scenarioMap = {
+      '1': 'scenario1CompleteSoulProfile',
+      's1': 'scenario1CompleteSoulProfile',
+      'scenario1': 'scenario1CompleteSoulProfile',
+      'completeprofile': 'scenario1CompleteSoulProfile',
+      'profile': 'scenario1CompleteSoulProfile',
+      '2': 'scenario2BusinessAnalytics',
+      's2': 'scenario2BusinessAnalytics',
+      'scenario2': 'scenario2BusinessAnalytics',
+      'businessanalytics': 'scenario2BusinessAnalytics',
+      'executivedashboard': 'scenario2BusinessAnalytics',
+      'analytics': 'scenario2BusinessAnalytics',
+      '3': 'scenario3SoulContractUpdate',
+      's3': 'scenario3SoulContractUpdate',
+      'scenario3': 'scenario3SoulContractUpdate',
+      'writeoperations': 'scenario3SoulContractUpdate',
+      'transaction': 'scenario3SoulContractUpdate',
+      'redemption': 'scenario3SoulContractUpdate',
+      '4': 'scenario4BatchOperations',
+      's4': 'scenario4BatchOperations',
+      'scenario4': 'scenario4BatchOperations',
+      'batchoperations': 'scenario4BatchOperations',
+      'batch': 'scenario4BatchOperations',
+      'dashboard': 'scenario4BatchOperations',
+      '5': 'scenario5AdvancedAnalytics',
+      's5': 'scenario5AdvancedAnalytics',
+      'scenario5': 'scenario5AdvancedAnalytics',
+      'advancedanalytics': 'scenario5AdvancedAnalytics',
+      'riskanalysis': 'scenario5AdvancedAnalytics',
+      'risk': 'scenario5AdvancedAnalytics'
+    };
+
+    const methodName = scenarioMap[normalized];
+    if (!methodName || typeof this[methodName] !== 'function') {
+      throw new Error(`Unknown scenario "${scenarioKey}". Available options: 1-5 or scenario1..scenario5.`);
+    }
+
+    console.log('THE DEVIL YOU NOSQL');
+    console.log('The Devil You Know vs The Devil You Don\'t\n');
+
+    await this.setupDSQL();
+
+    try {
+      console.log('Warming up connections...');
+      await this.warmupConnections();
+      console.log('Warmup complete\n');
+
+      if (['scenario1CompleteSoulProfile', 'scenario2BusinessAnalytics', 'scenario3SoulContractUpdate'].includes(methodName)) {
+        this.printPhilosophyHeading();
+      } else {
+        this.printStrengthsHeading();
+      }
+
+      await this[methodName]();
+    } finally {
+      if (this.dsqlClient) {
+        await this.dsqlClient.end();
+      }
+    }
+  }
+
   async warmupConnections() {
     // Warm up DynamoDB
     try {
@@ -88,6 +151,17 @@ class MainDemo {
     } catch (e) {
       // Ignore warmup errors
     }
+  }
+
+  printPhilosophyHeading() {
+    console.log('DESIGN PARADIGMS COMPARED');
+    console.log('==================================');
+    console.log('');
+  }
+
+  printStrengthsHeading() {
+    console.log('NATURAL STRENGTHS DEMONSTRATION');
+    console.log('==================================\n');
   }
 
   async fetchSoulPartition(soulId) {
@@ -120,12 +194,19 @@ class MainDemo {
   }
 
   async demoPhilosophy() {
-    console.log('DESIGN PARADIGMS COMPARED');
-    console.log('==================================');
+    this.printPhilosophyHeading();
+    await this.scenario1CompleteSoulProfile();
+    await this.scenario2BusinessAnalytics();
+    await this.demonstrateWriteOperations();
+  }
 
+  async demonstrateWriteOperations() {
+    await this.scenario3SoulContractUpdate();
+  }
+
+  async scenario1CompleteSoulProfile() {
     const soulId = await this.getSampleSoulId();
 
-    // Scenario 1: Complete Soul Profile - Rigorous statistical testing
     console.log('SCENARIO 1: Get complete soul profile (user-facing app)');
     console.log('  Goal: Retrieve soul contract + all events + total power in one operation');
     console.log("  Use case: Mobile app showing user's complete supernatural profile");
@@ -172,6 +253,7 @@ class MainDemo {
         this.dsqlContract = dsqlContract.rows[0] || null;
         this.dsqlEvents = dsqlEvents.rows;
         this.dsqlLedger = dsqlLedger.rows;
+        this.dsqlRowCount = (dsqlContract.rowCount || 0) + (dsqlEvents.rowCount || 0) + (dsqlLedger.rowCount || 0);
       }
 
       // Store result info from first run
@@ -238,8 +320,9 @@ class MainDemo {
       console.log(`   Ledger ${i + 1}: ${timestamp} - ${row.amount} (${row.description})`);
     });
     console.log('');
+  }
 
-    // Scenario 2: Analytics Query - Show both implementations
+  async scenario2BusinessAnalytics() {
     console.log('SCENARIO 2: Business analytics (executive dashboard)');
     console.log('    Goal: Analyze soul power distribution across all locations');
     console.log('    Use case: Executive dashboard showing business metrics\n');
@@ -376,12 +459,9 @@ class MainDemo {
       console.log(`   Location ${i + 1}: ${location} - ${data.soul_count} souls, ${data.redeemed} redeemed (${data.redemption_rate.toFixed(1)}%), Power: ${data.total_power}`);
     });
     console.log('');
-
-    // Write Operations Demonstration
-    await this.demonstrateWriteOperations();
   }
 
-  async demonstrateWriteOperations() {
+  async scenario3SoulContractUpdate() {
     console.log('SCENARIO 3: Soul contract status update (transaction scenario)');
     console.log('    Goal: Update contract status + add event + update ledger');
     console.log('    Use case: Ghost Rider completing a soul redemption\n');
@@ -596,11 +676,7 @@ class MainDemo {
     console.log('');
   }
 
-  async demoStrengths() {
-    console.log('NATURAL STRENGTHS DEMONSTRATION');
-    console.log('==================================\n');
-
-    // DynamoDB Strength: Batch Operations with detailed comparison
+  async scenario4BatchOperations() {
     console.log('DYNAMODB STRENGTH: Batch Operations');
     console.log('    Scenario 4: Retrieve multiple soul contracts for dashboard list');
     console.log('    Use case: Admin panel showing 10 recent contracts');
@@ -699,8 +775,16 @@ class MainDemo {
       });
     }
     console.log('');
+    return {
+      batchTime,
+      itemCount: keys.length,
+      dsqlInTime,
+      individualTime,
+      dsqlParallelTime
+    };
+  }
 
-    // DSQL Strength: Complex Queries with statistical analysis
+  async scenario5AdvancedAnalytics() {
     console.log('DSQL STRENGTH: Complex Business Logic');
     console.log('    Scenario 5: Advanced analytics with business rules');
     console.log('    Use case: Risk analysis for soul contract portfolio');
@@ -771,6 +855,11 @@ class MainDemo {
     }
     console.log('');
 
+    // Compare with DynamoDB approach (requires multiple queries + client code)
+    console.log('\nDynamoDB Equivalent Approach (conceptual):');
+    console.log('   - Would require scanning partitions, aggregating in memory, and managing windows manually');
+    console.log('   - Complex due to single-table design and lack of JOINs/window functions');
+    console.log('   - Feasible with prep pipelines, but harder for ad-hoc questions');
     console.log('    DynamoDB complex analytics: not executed');
     console.log('    Observation: Client-side recreation would require fetching every soul partition');
     console.log('    Attempted approach: loop over each location and soul, aggregate events and ledger entries in code');
@@ -778,27 +867,54 @@ class MainDemo {
     console.log('    (See commented prototype in scripts/demo.js for reference)');
     console.log('');
 
+    console.log('\nCOMPLEX ANALYTICS STATISTICS:');
+    console.log(`   Mean: ${complexStats.mean.toFixed(1)}ms`);
+    console.log(`   P95: ${complexStats.p95.toFixed(1)}ms`);
+    console.log(`   StdDev: ${complexStats.stdDev.toFixed(1)}ms`);
+    console.log(`   CV: ${complexStats.cv.toFixed(1)}%`);
+    console.log('   Insight: SQL engine can answer rich questions with stable latency');
+
+    console.log('\nDEMO TAKEAWAYS:');
+    console.log('   - DynamoDB for real-time, single-table workloads');
+    console.log('   - DSQL for analytics and reporting');
+    console.log('   - Choose the right tool for each use case');
+    return {
+      complexStats,
+      locationCount: complexResult?.rows?.length || 0
+    };
+  }
+
+  printStrengthSummary(batchMetrics, analyticsMetrics) {
+    if (!batchMetrics || !analyticsMetrics) return;
+
+    const { batchTime, itemCount } = batchMetrics;
+    const { complexStats } = analyticsMetrics;
+
     console.log('PERFORMANCE ANALYSIS');
     console.log('========================');
-    console.log(` DynamoDB batch operations: ${batchTime}ms for ${keys.length} items`);
-    console.log(`    Per-item cost: ${(batchTime/keys.length).toFixed(1)}ms per contract`);
-    console.log(`    Scalability: Linear performance up to 100 items per batch`);
-    console.log(` DSQL complex analytics: ${complexStats.mean.toFixed(1)}ms avg for business intelligence`);
-    console.log(`    Data processed: All contracts + events + ledger entries`);
-    console.log(`    Consistency: CV=${complexStats.cv.toFixed(1)}% (${complexStats.cv < 20 ? 'Excellent' : complexStats.cv < 40 ? 'Good' : 'Variable'})`);
-    console.log(`    Scalability: Performance depends on data volume and query complexity`);
+    if (typeof batchTime === 'number' && typeof itemCount === 'number' && itemCount > 0) {
+      console.log(` DynamoDB batch operations: ${batchTime.toFixed(1)}ms for ${itemCount} items`);
+      console.log(`    Per-item cost: ${(batchTime/itemCount).toFixed(1)}ms per contract`);
+      console.log('    Scalability: Linear performance up to 100 items per batch');
+    }
+    if (complexStats) {
+      console.log(` DSQL complex analytics: ${complexStats.mean.toFixed(1)}ms avg for business intelligence`);
+      console.log('    Data processed: All contracts + events + ledger entries');
+      console.log(`    Consistency: CV=${complexStats.cv.toFixed(1)}% (${complexStats.cv < 20 ? 'Excellent' : complexStats.cv < 40 ? 'Good' : 'Variable'})`);
+      console.log('    Scalability: Performance depends on data volume and query complexity');
+    }
     console.log('');
 
     console.log('SUMMARY & DECISION FRAMEWORK');
     console.log('=================================');
-    console.log('DynamoDB: "The devil you know"');
+    console.log('DynamoDB: \"The devil you know\"');
     console.log('    When to choose: User-facing apps, known access patterns, predictable load');
     console.log('    Performance: Consistent 25-35ms for entity operations');
     console.log('    Predictability: Low variability, reliable response times');
     console.log('    Cost model: Pay per operation, predictable scaling');
     console.log('    Sweet spot: Mobile apps, gaming, IoT, real-time applications');
     console.log('');
-    console.log('DSQL: "The devil you don\'t"');
+    console.log('DSQL: \"The devil you don\'t\"');
     console.log('    When to choose: Analytics, evolving requirements, complex relationships');
     console.log('    Performance: 30-50ms for analytics, variable for complex JOINs');
     console.log('    Unpredictability: Can range from 30ms to 300ms+ (cold starts, query complexity)');
@@ -825,6 +941,16 @@ class MainDemo {
     console.log('   - DSQL for analytics and reporting');
     console.log('   - Choose the right tool for each use case');
   }
+
+  async demoStrengths() {
+    this.printStrengthsHeading();
+
+    const batchMetrics = await this.scenario4BatchOperations();
+    const analyticsMetrics = await this.scenario5AdvancedAnalytics();
+
+    this.printStrengthSummary(batchMetrics, analyticsMetrics);
+  }
+
 
   calculateStats(times) {
     const n = times.length;
@@ -943,7 +1069,13 @@ class MainDemo {
 
 async function main() {
   const demo = new MainDemo();
-  await demo.runDemo();
+  const scenarioArg = process.argv[2];
+
+  if (scenarioArg) {
+    await demo.runScenario(scenarioArg);
+  } else {
+    await demo.runDemo();
+  }
 }
 
 if (require.main === module) {
