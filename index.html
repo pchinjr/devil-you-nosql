@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Devil You NoSQL - Ghost Rider Control Center</title>
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -53,11 +54,23 @@
             letter-spacing: 4px;
             font-size: 3.2rem;
             margin-bottom: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            text-shadow: 0 0 18px rgba(255, 130, 0, 0.45);
+        }
+
+        .header h1 .title-text {
+            color: #ff9333;
             background: linear-gradient(90deg, #ff9333 0%, #ffc400 35%, #ffe066 70%, #ffffff 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            text-shadow: 0 0 18px rgba(255, 130, 0, 0.45);
+        }
+
+        .header h1 .fire-emoji {
+            display: inline-block;
         }
 
         .header p {
@@ -340,7 +353,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔥 Devil You NoSQL</h1>
+            <h1><span class="fire-emoji" aria-hidden="true">🔥</span><span class="title-text">Devil You NoSQL</span></h1>
             <p>Ignite the duel between DynamoDB and Aurora DSQL</p>
         </div>
 

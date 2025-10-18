@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+<title id="title">Devil You NoSQL favicon</title>
+<desc id="desc">Stylized flaming skull representing the Ghost Rider theme</desc>
+<defs>
+  <radialGradient id="bg" cx="0.5" cy="0.18" r="0.75">
+    <stop offset="0" stop-color="#ffb347"/>
+    <stop offset="0.4" stop-color="#ff6a00"/>
+    <stop offset="1" stop-color="#1b0905"/>
+  </radialGradient>
+  <linearGradient id="flame" x1="0.5" y1="0" x2="0.5" y2="1">
+    <stop offset="0" stop-color="#ffe066"/>
+    <stop offset="0.45" stop-color="#ff9333"/>
+    <stop offset="1" stop-color="#d23a00"/>
+  </linearGradient>
+  <linearGradient id="skull" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fdf2d1"/>
+    <stop offset="1" stop-color="#d8c29c"/>
+  </linearGradient>
+</defs>
+<rect width="64" height="64" rx="14" fill="url(#bg)"/>
+<path fill="url(#flame)" d="M32 6c6 5 12 8 12 18 0 10-6 16-12 16s-12-6-12-16c0-10 6-13 12-18z"/>
+<path fill="url(#skull)" d="M32 24c7 0 12 6 12 13 0 6-4 12-12 12s-12-6-12-12c0-7 5-13 12-13z"/>
+<path fill="#1b0905" d="M26 34c1.5-1.5 4-1.5 5.5 0 1.5-1.5 4-1.5 5.5 0l-2 2c-.8-.8-1.8-.8-2.5 0-.7-.8-1.7-.8-2.5 0l-2-2zm-1 6h14c0 3-3 6-7 6s-7-3-7-6z"/>
+</svg>
