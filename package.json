@@ -11,6 +11,7 @@
     "demo": "node scripts/demo.js",
     "benchmark": "node scripts/benchmark.js",
     "seed": "npm run seed:small",
+    "reset:data": "node scripts/resetData.js",
     "seed:small": "node scripts/seedData.js --souls 10 --events 10 --ledger 50",
     "seed:large": "node scripts/seedData.js --souls 1000 --events 50 --ledger 5000",
     "seed:large:dsql": "node scripts/seedData.js --souls 1000 --events 50 --ledger 5000 --dsql-only",

@@ -210,6 +210,7 @@ Generated artefacts (`dist/`, `node_modules/`) are omitted above.
 | `npm run setup` | `scripts/setup.js` – tables, indexes, small seed, validate |
 | `npm run demo` | `scripts/demo.js` – full read/write demo with statistics |
 | `npm run seed` | alias for small seed (`--souls 10 --events 10 --ledger 50`) |
+| `npm run reset:data` | `scripts/resetData.js` – clear DynamoDB items and DSQL rows before reseeding |
 | `npm run seed:large` | large workload seed (chunked DSQL transactions) |
 | `npm run verify` | `scripts/verifyDatabases.js` |
 | `npm run validate` | `scripts/validate.js` |
@@ -229,13 +230,15 @@ npm run server
 
 Tabs:
 
-1. **Operations** – Buttons to run setup, verify, seed, and validate scripts.
+1. **Operations** – Buttons to run setup, verify, seed, reset, and validate scripts.
 2. **Benchmark** –
    - “Run Showcase Demo” → executes `scripts/demo.js`
-   - “Run Benchmark Suite” → executes `scripts/rigorousContrastBenchmark.js` with configurable iterations
+   - “Run Benchmark Suite” → executes `scripts/benchmark.js`
    - “View Benchmark History” → fetches saved benchmark logs (if any) from `server.js`
 
 The UI streams terminal output so you see the same statistical summaries the CLI prints: latency distributions, CV%, t-tests, audit logs, etc. Configuration fields were intentionally removed; the server uses `DSQL_ENDPOINT` and `AWS_REGION` from your environment.
+
+The **Reset Data** operation deletes demo data from both backing stores. Use it before reseeding when benchmark or demo output needs to start from a known clean dataset.
 
 ---
 
@@ -278,9 +281,11 @@ The showcase demo is intentionally noisy—it performs the real operations and p
 
 ## Operation Notes
 
+- **Data reset** – `resetData.js` removes all DynamoDB items with batched deletes and clears DSQL tables in row-limited batches. Run `npm run reset:data && npm run seed:small` for a clean small dataset.
 - **Transaction chunking** – `seedData.js` automatically commits after ~3,000 DSQL rows to respect Aurora DSQL limits.
 - **Index validation** – `validate.js` recognises both traditional index names and async index names (e.g., `ix_events_scid`).
 - **Parity checker** – `checkParity.js` samples N souls, compares contracts/events/ledger counts, and reports differences with exit code `1` on mismatch.
+- **Benchmark writes** – `benchmark.js` uses isolated throwaway records for write timing and cleans them up after each run so benchmarks do not mutate the seeded dataset.
 - **Complex Dynamo analytics** – left intentionally disabled in the demo output to avoid long runtimes; the exploratory logic (looping over partitions, aggregating events/ledger in JS) remains in comments for future work.
 - **Web UI** – scripts are run locally through `server.js`; nothing is deployed publicly.
 
@@ -293,10 +298,10 @@ The showcase demo is intentionally noisy—it performs the real operations and p
 npm run demo
 
 # Execute full benchmark suite with default iterations
-node scripts/rigorousContrastBenchmark.js
+npm run benchmark
 
-# Custom iteration count (e.g., 25 runs per scenario)
-node scripts/rigorousContrastBenchmark.js 25
+# Start from a clean small dataset
+npm run reset:data && npm run seed:small
 ```
 
 Benchmark scenarios:
@@ -306,7 +311,7 @@ Benchmark scenarios:
 4. Transactional write bundle
 5. Complex analytics (CTE + window functions)
 
-Each scenario records DynamoDB vs DSQL timings, prints stats, and saves history through `server.js` when invoked from the UI.
+Each scenario records DynamoDB vs DSQL timings and prints stats. The write benchmark uses temporary benchmark-only records, then deletes them before the suite continues.
 
 ---
 
@@ -318,7 +323,7 @@ Each scenario records DynamoDB vs DSQL timings, prints stats, and saves history 
 | `Transaction row limit exceeded` | Long DSQL transaction | Ensure you’re on latest `seedData.js` (auto-chunking). Re-run seed. |
 | Demo stalls during “complex analytics” | (Resolved) DynamoDB client-side analytics removed | Update repo; rerun demo. |
 | Web UI says “Failed to connect to local server” | `npm run server` not running | Start the Express server; keep shell open |
-| Parity checker reports mismatches | Databases out of sync | Re-run `npm run setup` or `npm run seed` to reset data |
+| Parity checker reports mismatches | Databases out of sync | Run `npm run reset:data && npm run seed:small` |
 
 ---
 

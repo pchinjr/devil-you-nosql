@@ -252,6 +252,11 @@
             color: #2d1b0f;
         }
 
+        .btn-danger {
+            background: linear-gradient(120deg, #b31312, #ea4c2b);
+            color: #fff6ec;
+        }
+
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
@@ -369,6 +374,7 @@
                 <button class="btn btn-primary" onclick="runSetup()">🚀 Complete Setup</button>
                 <button class="btn btn-warning" onclick="verifyDatabases()">🔍 Verify Databases</button>
                 <button class="btn btn-secondary" onclick="seedData()">🌱 Seed Data</button>
+                <button class="btn btn-danger" onclick="resetData()">Reset Data</button>
                 <button class="btn btn-secondary" onclick="validateData()">✅ Validate Data</button>
             </div>
         </div>
@@ -728,6 +734,13 @@
 
         async function seedData() {
             await executeScript('seedData.js', ['--souls', '10', '--events', '10', '--ledger', '50']);
+        }
+
+        async function resetData() {
+            const confirmed = confirm('Delete all demo data from DynamoDB and Aurora DSQL?');
+            if (!confirmed) return;
+
+            await executeScript('resetData.js');
         }
 
         async function verifyDatabases() {

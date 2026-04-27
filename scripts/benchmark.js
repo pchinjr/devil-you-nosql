@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 require('dotenv').config();
-const { DynamoDBClient, QueryCommand, BatchGetItemCommand, TransactWriteItemsCommand } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBClient, QueryCommand, BatchGetItemCommand, TransactWriteItemsCommand, BatchWriteItemCommand } = require('@aws-sdk/client-dynamodb');
 const { DsqlSigner } = require('@aws-sdk/dsql-signer');
 const { Client } = require('pg');
 
@@ -57,7 +57,7 @@ class BenchmarkSuite {
     await this.benchmarkBatchOperations(multipleSoulIds, 50);
 
     // Benchmark 4: Write Operations (30 iterations)
-    await this.benchmarkWriteOperations(soulId, 30);
+    await this.benchmarkWriteOperations(30);
 
     // Benchmark 5: Complex Analytics (25 iterations)
     await this.benchmarkComplexAnalytics(25);
@@ -270,76 +270,85 @@ class BenchmarkSuite {
     console.log(`📈 Batch efficiency: ${(dynamoIndividualStats.mean / dynamoBatchStats.mean).toFixed(1)}x faster`);
   }
 
-  async benchmarkWriteOperations(soulId, iterations) {
+  async benchmarkWriteOperations(iterations) {
     console.log(`\n✍️  BENCHMARK 4: Write Operations (${iterations} iterations)`);
     console.log('   🎯 Scenario: Transaction processing for soul contract updates');
-    console.log('   💾 Comparing transaction performance and consistency\n');
+    console.log('   💾 Comparing transaction performance and consistency');
+    console.log('   🧹 Uses throwaway benchmark records and cleans them up after the run\n');
 
     const dynamoTimes = [];
     const dsqlTimes = [];
+    const runId = `benchmark_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
-    for (let i = 0; i < iterations; i++) {
-      const timestamp = new Date().toISOString();
-      const amount = Math.floor(Math.random() * 1000) + 100;
+    try {
+      await this.setupBenchmarkWriteRecords(runId, iterations);
 
-      // DynamoDB transaction
-      const dynamoStart = Date.now();
-      try {
-        await dynamodb.send(new TransactWriteItemsCommand({
-          TransactItems: [
-            {
-              Update: {
-                TableName: TABLE_NAME,
-                Key: { 
-                  PK: { S: `SOUL#${soulId}` }, 
-                  SK: { S: 'CONTRACT' } 
-                },
-                UpdateExpression: 'SET updated_at = :timestamp',
-                ExpressionAttributeValues: { ':timestamp': { S: timestamp } }
-              }
-            },
-            {
-              Put: {
-                TableName: TABLE_NAME,
-                Item: {
-                  PK: { S: `SOUL#${soulId}` },
-                  SK: { S: `EVENT#${timestamp}` },
-                  description: { S: `Benchmark event ${i}` },
-                  timestamp: { S: timestamp }
+      for (let i = 0; i < iterations; i++) {
+        const timestamp = new Date().toISOString();
+        const dynamoSoulId = `${runId}_dynamo_${i}`;
+        const dsqlSoulId = `${runId}_dsql_${i}`;
+
+        // DynamoDB transaction
+        const dynamoStart = Date.now();
+        try {
+          await dynamodb.send(new TransactWriteItemsCommand({
+            TransactItems: [
+              {
+                Update: {
+                  TableName: TABLE_NAME,
+                  Key: {
+                    PK: { S: `SOUL#${dynamoSoulId}` },
+                    SK: { S: 'CONTRACT' }
+                  },
+                  UpdateExpression: 'SET updated_at = :timestamp',
+                  ExpressionAttributeValues: { ':timestamp': { S: timestamp } }
+                }
+              },
+              {
+                Put: {
+                  TableName: TABLE_NAME,
+                  Item: {
+                    PK: { S: `SOUL#${dynamoSoulId}` },
+                    SK: { S: `EVENT#${timestamp}` },
+                    description: { S: `Benchmark event ${i}` },
+                    timestamp: { S: timestamp }
+                  }
                 }
               }
-            }
-          ]
-        }));
-        const dynamoTime = Date.now() - dynamoStart;
-        dynamoTimes.push(dynamoTime);
-      } catch (error) {
-        console.log(`   ⚠️ DynamoDB transaction ${i} failed: ${error.message}`);
-      }
+            ]
+          }));
+          const dynamoTime = Date.now() - dynamoStart;
+          dynamoTimes.push(dynamoTime);
+        } catch (error) {
+          console.log(`   ⚠️ DynamoDB transaction ${i} failed: ${error.message}`);
+        }
 
-      // DSQL transaction
-      const dsqlStart = Date.now();
-      try {
-        await this.dsqlClient.query('BEGIN');
-        await this.dsqlClient.query(
-          'UPDATE soul_contracts SET updated_at = $1 WHERE id = $2',
-          [timestamp, soulId]
-        );
-        await this.dsqlClient.query(
-          'INSERT INTO soul_contract_events (soul_contract_id, description, event_time) VALUES ($1, $2, $3)',
-          [soulId, `Benchmark event ${i}`, timestamp]
-        );
-        await this.dsqlClient.query('COMMIT');
-        const dsqlTime = Date.now() - dsqlStart;
-        dsqlTimes.push(dsqlTime);
-      } catch (error) {
-        await this.dsqlClient.query('ROLLBACK');
-        console.log(`   ⚠️ DSQL transaction ${i} failed: ${error.message}`);
-      }
+        // DSQL transaction
+        const dsqlStart = Date.now();
+        try {
+          await this.dsqlClient.query('BEGIN');
+          await this.dsqlClient.query(
+            'UPDATE soul_contracts SET updated_at = $1 WHERE id = $2',
+            [timestamp, dsqlSoulId]
+          );
+          await this.dsqlClient.query(
+            'INSERT INTO soul_contract_events (soul_contract_id, description, event_time) VALUES ($1, $2, $3)',
+            [dsqlSoulId, `Benchmark event ${i}`, timestamp]
+          );
+          await this.dsqlClient.query('COMMIT');
+          const dsqlTime = Date.now() - dsqlStart;
+          dsqlTimes.push(dsqlTime);
+        } catch (error) {
+          await this.dsqlClient.query('ROLLBACK');
+          console.log(`   ⚠️ DSQL transaction ${i} failed: ${error.message}`);
+        }
 
-      if ((i + 1) % 10 === 0) {
-        console.log(`   Progress: ${i + 1}/${iterations} iterations completed`);
+        if ((i + 1) % 10 === 0) {
+          console.log(`   Progress: ${i + 1}/${iterations} iterations completed`);
+        }
       }
+    } finally {
+      await this.cleanupBenchmarkWrites(runId, iterations);
     }
 
     const dynamoStats = this.calculateAdvancedStats(dynamoTimes);
@@ -360,6 +369,115 @@ class BenchmarkSuite {
     } else {
       console.log(`⚡ DSQL: No successful transactions (all failed)`);
     }
+  }
+
+  async cleanupBenchmarkWrites(runId, iterations) {
+    console.log('   🧹 Cleaning up write benchmark records...');
+    await this.cleanupDynamoBenchmarkWrites(runId, iterations);
+    await this.cleanupDsqlBenchmarkWrites(runId);
+  }
+
+  async setupBenchmarkWriteRecords(runId, iterations) {
+    console.log('   Preparing isolated write benchmark records...');
+    const now = new Date().toISOString();
+    const dynamoRequests = [];
+
+    for (let i = 0; i < iterations; i++) {
+      const soulId = `${runId}_dynamo_${i}`;
+      dynamoRequests.push({
+        PutRequest: {
+          Item: {
+            PK: { S: `SOUL#${soulId}` },
+            SK: { S: 'CONTRACT' },
+            soulId: { S: soulId },
+            status: { S: 'Benchmark' },
+            soul_type: { S: 'Benchmark' },
+            contract_location: { S: 'Benchmark' },
+            createdAt: { S: now },
+            updated_at: { S: now }
+          }
+        }
+      });
+    }
+
+    for (let i = 0; i < dynamoRequests.length; i += 25) {
+      let requests = dynamoRequests.slice(i, i + 25);
+      while (requests.length > 0) {
+        const response = await dynamodb.send(new BatchWriteItemCommand({
+          RequestItems: {
+            [TABLE_NAME]: requests
+          }
+        }));
+        requests = response.UnprocessedItems?.[TABLE_NAME] || [];
+        if (requests.length > 0) {
+          await wait(250);
+        }
+      }
+    }
+
+    await this.dsqlClient.query('BEGIN');
+    try {
+      for (let i = 0; i < iterations; i++) {
+        await this.dsqlClient.query(
+          `INSERT INTO soul_contracts (id, contract_status, soul_type, contract_location, updated_at)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [`${runId}_dsql_${i}`, 'Benchmark', 'Benchmark', 'Benchmark', now]
+        );
+      }
+      await this.dsqlClient.query('COMMIT');
+    } catch (error) {
+      await this.dsqlClient.query('ROLLBACK');
+      throw error;
+    }
+  }
+
+  async cleanupDynamoBenchmarkWrites(runId, iterations) {
+    const deleteRequests = [];
+
+    for (let index = 0; index < iterations; index++) {
+      const soulId = `${runId}_dynamo_${index}`;
+      const result = await dynamodb.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: 'PK = :pk',
+        ExpressionAttributeValues: {
+          ':pk': { S: `SOUL#${soulId}` }
+        }
+      }));
+
+      const items = result.Items || [];
+      for (const item of items) {
+        deleteRequests.push({
+          DeleteRequest: {
+            Key: {
+              PK: item.PK,
+              SK: item.SK
+            }
+          }
+        });
+      }
+    }
+
+    for (let i = 0; i < deleteRequests.length; i += 25) {
+      let requests = deleteRequests.slice(i, i + 25);
+      while (requests.length > 0) {
+        const response = await dynamodb.send(new BatchWriteItemCommand({
+          RequestItems: {
+            [TABLE_NAME]: requests
+          }
+        }));
+        requests = response.UnprocessedItems?.[TABLE_NAME] || [];
+        if (requests.length > 0) {
+          await wait(250);
+        }
+      }
+    }
+  }
+
+  async cleanupDsqlBenchmarkWrites(runId) {
+    const pattern = `${runId}_dsql_%`;
+    await this.dsqlClient.query('DELETE FROM soul_contract_events WHERE soul_contract_id LIKE $1', [pattern]);
+    await this.dsqlClient.query('DELETE FROM soul_ledger WHERE soul_contract_id LIKE $1', [pattern]);
+    await this.dsqlClient.query('DELETE FROM soul_contracts WHERE id LIKE $1', [pattern]);
   }
 
   async benchmarkComplexAnalytics(iterations) {
@@ -537,6 +655,10 @@ class BenchmarkSuite {
     
     return result.Items.map(item => item.soulId.S);
   }
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // Run the benchmark

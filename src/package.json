@@ -5,6 +5,7 @@
     "@aws-sdk/client-dynamodb": "^3.0.0",
     "@aws-sdk/lib-dynamodb": "^3.0.0",
     "@aws-sdk/dsql-signer": "^3.0.0",
+    "dotenv": "^16.6.1",
     "pg": "^8.11.0",
     "uuid": "^9.0.0"
   }

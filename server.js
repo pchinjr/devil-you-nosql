@@ -27,6 +27,7 @@ app.post('/api/run-script', (req, res) => {
     'setup.js',
     'demo.js',
     'seedData.js',
+    'resetData.js',
     'verifyDatabases.js',
     'validate.js',
     'benchmark.js'
