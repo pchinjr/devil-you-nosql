@@ -293,6 +293,8 @@ The showcase demo is intentionally noisy—it performs the real operations and p
 
 ## Installing & Running Benchmarks Manually
 
+For a scenario-by-scenario explanation of what the benchmark measures and how to interpret the results, see [Benchmark Scenario Walkthrough](docs/benchmark-scenarios.md).
+
 ```bash
 # Run the main showcase demo
 npm run demo
