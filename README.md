@@ -27,15 +27,15 @@ Both sides receive identical datasets via the setup/seeding workflow so demos an
 
 ### DynamoDB Single-Table Layout
 
-| PK            | SK                        | GSI1PK             | GSI1SK             | Core Attributes                                                     |
-|---------------|---------------------------|--------------------|--------------------|---------------------------------------------------------------------|
-| `SOUL#<id>`   | `CONTRACT`                | `STATUS#<status>`  | `<updated_at ISO>` | `status`, `soul_type`, `contract_location`, `updated_at`, `createdAt` |
-| `SOUL#<id>`   | `EVENT#<timestamp>`       | `EVENT#<date>`     | `<timestamp ISO>`  | `description`, `eventType`, `timestamp`                              |
-| `SOUL#<id>`   | `LEDGER#<timestamp>`      | `LEDGER#<date>`    | `<timestamp ISO>`  | `amount`, `description`, `timestamp`                                 |
+| PK            | SK                        | Indexed Attributes                 | Core Attributes                                                     |
+|---------------|---------------------------|------------------------------------|---------------------------------------------------------------------|
+| `SOUL#<id>`   | `CONTRACT`                | `status`, `contract_location`      | `soulId`, `status`, `soul_type`, `contract_location`, `updated_at`, `createdAt` |
+| `SOUL#<id>`   | `EVENT#<timestamp>`       | item collection via `PK`/`SK`      | `description`, `eventType`, `timestamp`                              |
+| `SOUL#<id>`   | `LEDGER#<timestamp>`      | item collection via `PK`/`SK`      | `amount`, `description`, `timestamp`                                 |
 
 - All records for a soul share the same partition key (`PK = SOUL#<id>`).
 - Sort keys encode item type and chronological ordering (`CONTRACT`, `EVENT#`, `LEDGER#`).
-- A single GSI (`STATUS#`, `EVENT#date`, `LEDGER#date`) backs alternate read patterns.
+- `StatusIndex` and `LocationIndex` back contract-oriented alternate read patterns.
 
 ### Aurora DSQL Normalized Schema
 
@@ -102,8 +102,8 @@ flowchart LR
     LambdaDsql --> AuroraDSQL
 ```
 
-- CloudFormation (SAM) deploys API Gateway, both Lambdas, DynamoDB table, and IAM roles.
-- Aurora DSQL cluster must exist already; setup scripts create tables/indexes and seed data.
+- CloudFormation (SAM) deploys API Gateway, both Lambdas, DynamoDB table, IAM roles, and the Aurora DSQL cluster.
+- Setup scripts create DSQL tables/indexes and seed data after the stack is deployed.
 - Lambdas are invoked through API Gateway for programmatic comparisons (optional in demo).
 
 ### Front-End / BFF (Browser ↔ Express ↔ Local Scripts)
@@ -141,6 +141,7 @@ devil-you-nosql/
 │   ├── createDsqlIndexes.js
 │   ├── createSoulTrackerTables.js
 │   ├── demo.js             # Main philosophy demo (reads + writes + analytics)
+│   ├── resetData.js        # Clears DynamoDB and DSQL data before reseeding
 │   ├── seedData.js         # Configurable data generator (small/large)
 │   ├── setup.js            # One-button setup (tables, indexes, small seed, validate)
 │   ├── validate.js         # Cross-database validation
@@ -148,6 +149,8 @@ devil-you-nosql/
 ├── src/
 │   ├── dynamoSoulTracker.ts
 │   └── dsqlSoulTracker.ts
+├── docs/
+│   └── benchmark-scenarios.md
 ├── template.yaml           # SAM template (Lambda + API Gateway + DynamoDB + VPC hooks)
 ├── package.json            # NPM scripts, dependencies
 ├── samconfig.toml          # Optional SAM defaults
@@ -163,14 +166,13 @@ Generated artefacts (`dist/`, `node_modules/`) are omitted above.
 - Node.js **20+**
 - AWS CLI credentials with rights to create DynamoDB tables, Lambda, API Gateway, IAM roles, and connect to your Aurora DSQL cluster
 - **SAM CLI** (`sam --version` should work)
-- An **Aurora DSQL** cluster (Preview) – capture its endpoint
 - Environment variables when running scripts:
   ```bash
   export AWS_REGION=us-east-1          # or your region
   export DSQL_ENDPOINT=xxxxxxxxxx.dsql.us-east-1.on.aws
   ```
 
-> ⚠️ CloudFormation cannot create Aurora DSQL tables yet. You must run the setup scripts after SAM deploys the cluster.
+> ⚠️ The SAM template creates the Aurora DSQL cluster, but the schema is still created by local setup scripts. Set `DSQL_ENDPOINT` from the stack output before running local scripts.
 
 ---
 
@@ -185,7 +187,7 @@ Generated artefacts (`dist/`, `node_modules/`) are omitted above.
    sam build --template-file template.yaml
    sam deploy --guided --stack-name devil-you-nosql
    ```
-   This provisions the Lambdas, API Gateway, DynamoDB table, roles/VPC attachments. Aurora DSQL is expected to already exist (the template can import an existing cluster endpoint).
+   This provisions the Lambdas, API Gateway, DynamoDB table, IAM roles, and Aurora DSQL cluster.
 3. **Run the setup pipeline** (creates DSQL tables, indexes, seeds small dataset)
    ```bash
    npm run setup              # -> node scripts/setup.js
@@ -234,9 +236,8 @@ Tabs:
 2. **Benchmark** –
    - “Run Showcase Demo” → executes `scripts/demo.js`
    - “Run Benchmark Suite” → executes `scripts/benchmark.js`
-   - “View Benchmark History” → fetches saved benchmark logs (if any) from `server.js`
 
-The UI streams terminal output so you see the same statistical summaries the CLI prints: latency distributions, CV%, t-tests, audit logs, etc. Configuration fields were intentionally removed; the server uses `DSQL_ENDPOINT` and `AWS_REGION` from your environment.
+The UI streams terminal output so you see the same summaries the CLI prints: latency distributions, CV%, architectural takeaways, audit logs, etc. Configuration fields were intentionally removed; the server uses `DSQL_ENDPOINT` and `AWS_REGION` from your environment.
 
 The **Reset Data** operation deletes demo data from both backing stores. Use it before reseeding when benchmark or demo output needs to start from a known clean dataset.
 
@@ -249,7 +250,7 @@ The showcase demo is intentionally noisy—it performs the real operations and p
 1. **Scenario 1 – User profile fetch (“complete soul profile”)**
    - DynamoDB: partition query returning contract + events + ledger entries (~50 items)
    - DSQL: contract row + event rows + ledger rows fetched separately to mimic Dynamo output
-   - Stats: mean latency, min/max, P95, std dev, CV, t-test & effect size
+   - Stats: mean latency, min/max, median, P95, std dev, CV
    - Sample output: lists each DynamoDB item (SK order) plus a normalized DSQL item list.
 
 2. **Scenario 2 – Analytics (“executive dashboard”)**
@@ -260,6 +261,7 @@ The showcase demo is intentionally noisy—it performs the real operations and p
 3. **Scenario 3 – Write transaction**
    - DynamoDB: `TransactWriteCommand` (update + event insert + ledger insert)
    - DSQL: explicit `BEGIN`/`COMMIT` plus individual statements
+   - Uses temporary demo-only records and cleans them up after the scenario
    - Outputs post-transaction partition scan (Dynamo) and lateral audit (DSQL)
    - Summarises measured times and relative gap instead of static prose
 
@@ -270,7 +272,7 @@ The showcase demo is intentionally noisy—it performs the real operations and p
 
 5. **Complex analytics**
    - DSQL CTE with window functions for risk analysis (net power, activity, ranking)
-   - DynamoDB version **disabled**: the script now logs that client-side replication is impractical and points to the commented prototype. (We left the exploratory code in comments for future reference.)
+   - DynamoDB version **disabled**: the script logs that an equivalent operational query requires aggregate tables, streams, ETL, or a separate analytical projection.
 
 6. **Summary**
    - “Decision matrix” comparing DynamoDB vs DSQL depending on latency sensitivity, flexibility, costs, etc.

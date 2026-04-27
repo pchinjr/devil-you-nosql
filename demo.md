@@ -1,211 +1,183 @@
 # Devil You NoSQL Demo Walkthrough
 
-*A live demonstration comparing DynamoDB and Aurora DSQL for soul contract management*
+This demo is the narrative companion to the benchmark suite. It is meant for a live architecture conversation: show the same soul-contract domain in DynamoDB and Aurora DSQL, then explain which workload shape naturally belongs in each system.
 
----
+For rigorous repeatable timing, use `npm run benchmark`. For a guided talk track with sample rows and explanatory output, use `npm run demo`.
 
-## Opening Hook (2 minutes)
+## Before You Demo
 
-**Speaking Notes:**
-"Today we're exploring a fundamental question in modern application architecture: when do you choose the devil you know versus the devil you don't? In our case, that's NoSQL versus SQL for managing data at scale."
+Start from a clean dataset when presenting:
 
-**Demo Setup:**
-- Show the Ghost Rider theme: "We're building a soul contract tracking system"
-- Explain the two approaches: DynamoDB (NoSQL) vs Aurora DSQL (SQL)
-- Set expectations: "We'll see real performance differences and trade-offs"
-
----
-
-## Architecture Overview (3 minutes)
-
-**Speaking Notes:**
-"Let's start with what we've built. This isn't just a toy example - it demonstrates real architectural patterns you'd use in production."
-
-**Show the Structure:**
-```
-DynamoDB Approach:          Aurora DSQL Approach:
-┌─────────────────┐        ┌─────────────────┐
-│ Single Table    │        │ Normalized      │
-│ PK: SOUL#001    │        │ Tables with     │
-│ SK: LEDGER#uuid │        │ Foreign Keys    │
-└─────────────────┘        └─────────────────┘
-```
-
-**Key Points:**
-- "DynamoDB uses a single-table design with composite keys"
-- "DSQL uses traditional normalized tables with relationships"
-- "Both are serverless, but scale differently"
-
----
-
-## Live Demo: Basic Operations (5 minutes)
-
-### 1. Show the APIs in Action
-
-**Speaking Notes:**
-"Let's see both systems handle the same soul contract operation."
-
-**DynamoDB Request:**
 ```bash
-curl -X POST <DynamoApiUrl>/dynamo/souls \
-  -H "Content-Type: application/json" \
-  -d '{"soulId":"demo-soul-001","newStatus":"Released","amount":100}'
+npm run reset:data
+npm run seed:small
+npm run check:parity
 ```
 
-**Aurora DSQL Request:**
+Then run the full demo:
+
 ```bash
-curl -X POST <AuroraApiUrl>/dsql/souls \
-  -H "Content-Type: application/json" \
-  -d '{"soulContractId":"demo-soul-001","newStatus":"Released","amount":150,"endpoint":"<your-endpoint>"}'
+npm run demo
 ```
 
-**Speaking Notes:**
-- "Notice both APIs return similar results, but the underlying operations are completely different"
-- "DynamoDB is doing key-based lookups, DSQL is running SQL transactions"
+Or run one scenario:
 
-### 2. Performance Comparison
-
-**Speaking Notes:**
-"Now let's see the performance characteristics in action."
-
-**Run Performance Tests:**
 ```bash
-# DynamoDB latency test
-DSQL_ENDPOINT=<endpoint> node scripts/measureDynamo.js
-
-# Aurora DSQL latency test  
-DSQL_ENDPOINT=<endpoint> node scripts/measureDsql.js
+node scripts/demo.js scenario1
+node scripts/demo.js scenario2
+node scripts/demo.js scenario3
+node scripts/demo.js scenario4
+node scripts/demo.js scenario5
 ```
 
-**Expected Results to Highlight:**
-- "DynamoDB: Sub-10ms consistent lookups"
-- "DSQL: Higher latency but enables complex operations"
+The web UI exposes the same scenario selector under the Benchmark tab.
 
----
+## Opening Frame
 
-## The Real Difference: Analytics (7 minutes)
+The project asks a practical architecture question: when do you choose the data model optimized for known operational access patterns, and when do you choose the SQL model optimized for flexible relationships and analytics?
 
-**Speaking Notes:**
-"Here's where the architectural choice really matters. Let's run the same analytics query on both systems."
+Use this framing:
 
-### DynamoDB Analytics (Client-Side)
+- DynamoDB is the fixed-access-pattern engine: fast key lookups, single-table item collections, explicit denormalization.
+- Aurora DSQL is the relational query engine: normalized rows, SQL transactions, joins, grouped analytics, and ad hoc exploration.
+- Neither is universally better. The right answer depends on workload shape.
 
-**Show the Code:**
+## Scenario 1: Complete Soul Profile
+
+**Command:**
+
 ```bash
-node scripts/analyticsDynamo.js
+node scripts/demo.js scenario1
 ```
 
-**Speaking Notes:**
-- "DynamoDB requires us to fetch all data and compute analytics client-side"
-- "Multiple API calls, JavaScript processing"
-- "Great for simple aggregations, but complex for advanced analytics"
+**Story:** A user-facing app needs one complete soul profile: the contract, event history, and ledger history.
 
-### Aurora DSQL Analytics (Server-Side)
+**DynamoDB path:**
 
-**Show the Code:**
+- One partition query against `PK = SOUL#<id>`.
+- Returns the contract, events, and ledger entries as one single-table item collection.
+- Demonstrates the strength of modeling related data into one known partition.
+
+**DSQL path:**
+
+- Reads the contract row from `soul_contracts`.
+- Reads related events from `soul_contract_events`.
+- Reads related ledger entries from `soul_ledger`.
+- Renders those normalized rows into the same profile shape.
+
+**Architect takeaway:** DynamoDB is the natural fit for known entity-centric reads. DSQL remains easy to reason about, but the normalized shape costs additional query work for this access pattern.
+
+## Scenario 2: Business Analytics
+
+**Command:**
+
 ```bash
-node scripts/analyticsDsql.js
+node scripts/demo.js scenario2
 ```
 
-**Speaking Notes:**
-- "DSQL handles the same analytics in a single SQL query"
-- "CTEs, window functions, complex aggregations - all server-side"
-- "This is the power of SQL for analytical workloads"
+**Story:** An executive dashboard needs location-level business metrics.
 
-**Show the SQL:**
-```sql
-WITH daily_totals AS (
-  SELECT 
-    DATE(created_at) as contract_date,
-    SUM(amount) as daily_total
-  FROM soul_ledger 
-  GROUP BY DATE(created_at)
-),
-running_totals AS (
-  SELECT 
-    contract_date,
-    daily_total,
-    SUM(daily_total) OVER (ORDER BY contract_date) as running_total
-  FROM daily_totals
-)
-SELECT 
-  contract_date,
-  daily_total,
-  running_total,
-  RANK() OVER (ORDER BY daily_total DESC) as day_rank
-FROM running_totals
-ORDER BY contract_date;
+**DSQL path:**
+
+- Uses SQL aggregation to calculate counts, redeemed totals, power totals, averages, and redemption rates.
+- Keeps the analytical logic server-side and declarative.
+
+**DynamoDB path:**
+
+- Queries contracts by location.
+- Fetches each soul's ledger entries.
+- Aggregates and sorts results in application code.
+
+**Architect takeaway:** DSQL is the cleaner fit for grouped analytics and changing dashboard questions. DynamoDB can serve the result, but only by doing client-side fan-out or by maintaining purpose-built aggregate projections.
+
+## Scenario 3: Transactional Write Bundle
+
+**Command:**
+
+```bash
+node scripts/demo.js scenario3
 ```
 
----
+**Story:** A redemption operation updates a contract, appends an event, and appends a ledger entry.
 
-## Trade-offs Discussion (5 minutes)
+**Data safety:** This scenario uses temporary demo-only records and deletes them after the scenario. It should not mutate the seeded demo dataset.
 
-**Speaking Notes:**
-"So when do you choose each approach? It comes down to your access patterns and requirements."
+**DynamoDB path:**
 
-### Choose DynamoDB When:
-- **Predictable access patterns**: "You know exactly how you'll query your data"
-- **Scale requirements**: "You need guaranteed performance at web scale"
-- **Operational simplicity**: "You want zero database administration"
-- **Key-based lookups**: "Your queries are primarily by primary key"
+- Uses `TransactWrite` against records in one synthetic soul partition.
+- Updates the contract item and inserts event and ledger items.
 
-### Choose Aurora DSQL When:
-- **Complex analytics**: "You need rich querying capabilities"
-- **Ad hoc queries**: "Business users need to explore data flexibly"
-- **Relational data**: "Your data has natural relationships"
-- **SQL expertise**: "Your team knows SQL and wants standard tooling"
+**DSQL path:**
 
----
+- Uses `BEGIN` / `COMMIT`.
+- Updates `soul_contracts`.
+- Inserts into `soul_contract_events`.
+- Inserts into `soul_ledger`.
 
-## Performance Deep Dive (3 minutes)
+**Architect takeaway:** DynamoDB is a strong fit for small predictable operational write bundles. DSQL is the better fit when the write needs relational constraints, normalized multi-table invariants, or SQL-side business rules.
 
-**Speaking Notes:**
-"Let's look at the actual performance characteristics we measured."
+## Scenario 4: Batch Contract Fetch
 
-**Show Results:**
-- **DynamoDB**: "Consistent sub-10ms for point lookups, but analytics require multiple round trips"
-- **Aurora DSQL**: "Higher connection overhead, but complex queries execute server-side"
-- **Scaling**: "DynamoDB auto-scales seamlessly, DSQL provides serverless SQL processing"
+**Command:**
 
-**Key Insight:**
-"DynamoDB is compute-optimized - performance is about CPU and network. DSQL is storage-optimized - performance improves with indexing and query optimization."
+```bash
+node scripts/demo.js scenario4
+```
 
----
+**Story:** An admin dashboard loads several known contracts at once.
 
-## Closing: The Devil You Choose (2 minutes)
+**DynamoDB path:**
 
-**Speaking Notes:**
-"The title 'Devil You NoSQL' reflects a real architectural decision. Both approaches have trade-offs."
+- Uses `BatchGet` for multiple contract keys.
+- Compares that with individual DynamoDB `Get` calls to show round-trip overhead.
 
-**Final Recommendations:**
-- "For web applications with predictable patterns: DynamoDB"
-- "For analytics and complex queries: Aurora DSQL"
-- "For many applications: You might need both"
+**DSQL path:**
 
-**Call to Action:**
-- "Try both approaches with your own data patterns"
-- "The code is available - experiment with the trade-offs"
-- "Choose based on your specific requirements, not general preferences"
+- Uses a primary-key `ANY($1::text[])` query.
+- Also shows parallel individual SQL queries as a less ideal approach.
 
----
+**Architect takeaway:** Both systems can batch known IDs effectively. DynamoDB has a purpose-built batch API; DSQL keeps the operation composable with filters, joins, ordering, and additional relational context.
 
-## Q&A Preparation
+## Scenario 5: Advanced Analytics
 
-**Common Questions:**
+**Command:**
 
-**Q: "Can't you just use DynamoDB Streams for analytics?"**
-A: "Yes, but you're building a separate analytical pipeline. DSQL gives you analytics in the operational database."
+```bash
+node scripts/demo.js scenario5
+```
 
-**Q: "What about cost?"**
-A: "DynamoDB charges for throughput, DSQL charges for compute. Cost depends on your usage patterns."
+**Story:** A portfolio-risk dashboard needs multi-step business logic, rankings, and derived metrics.
 
-**Q: "Why not just use RDS?"**
-A: "Aurora DSQL is serverless with automatic scaling. No instance management, pay-per-query pricing."
+**DSQL path:**
 
-**Q: "Can you mix both approaches?"**
-A: "Absolutely. Many architectures use DynamoDB for operational data and DSQL for analytics."
+- Uses CTEs to pre-aggregate ledger and event metrics.
+- Builds per-soul metrics.
+- Rolls them up by location.
+- Uses ranking and derived percentages for dashboard output.
 
----
+**DynamoDB path:**
 
-*Total Demo Time: ~27 minutes + Q&A*
+- Not executed as a timed equivalent.
+- The demo explains that this workload requires a separate analytical design in DynamoDB: aggregate tables, streams, ETL, or a warehouse-style read model.
+
+**Architect takeaway:** DSQL is the definite fit for ad hoc relational analytics. DynamoDB can support the business outcome, but the architecture needs an explicit projection or pipeline.
+
+## Final Decision Rule
+
+Use the same decision rule as the benchmark suite:
+
+- Choose **DynamoDB** for fixed, key-oriented operational paths.
+- Choose **Aurora DSQL** when query flexibility, joins, and analytics are first-class requirements.
+- Use **both** when the product has latency-sensitive operational workflows and separate analytical/exploratory workflows.
+
+## Presenter Notes
+
+- Do not present one run's latency numbers as universal truth. Treat them as local observations.
+- Use `npm run benchmark` for repeatable comparisons and `npm run demo` for storytelling.
+- If parity fails before a demo, run:
+
+```bash
+npm run reset:data
+npm run seed:small
+npm run check:parity
+```
