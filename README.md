@@ -300,18 +300,29 @@ npm run demo
 # Execute full benchmark suite with default iterations
 npm run benchmark
 
+# Use one iteration count for all comparable scenarios
+node scripts/benchmark.js 25
+
+# Tune individual scenarios
+node scripts/benchmark.js \
+  --profile-iterations 100 \
+  --analytics-iterations 50 \
+  --batch-iterations 50 \
+  --write-iterations 30 \
+  --complex-iterations 25
+
 # Start from a clean small dataset
 npm run reset:data && npm run seed:small
 ```
 
 Benchmark scenarios:
-1. User profile retrieval
-2. Location analytics
-3. Batch contract fetch
-4. Transactional write bundle
-5. Complex analytics (CTE + window functions)
+1. **Complete profile read** – equivalent profile shape from a DynamoDB partition query vs indexed DSQL lookups.
+2. **Location analytics** – equivalent grouped business metrics; DynamoDB aggregates client-side while DSQL uses grouped SQL.
+3. **Batch contract fetch** – DynamoDB `BatchGetItem` vs DSQL primary-key `IN` query, plus individual DynamoDB lookups as a baseline.
+4. **Transactional write bundle** – update + event insert against isolated benchmark-only records, cleaned up after each run.
+5. **Complex SQL analytics** – DSQL CTE/window-function query with DynamoDB intentionally framed as requiring a separate analytical projection.
 
-Each scenario records DynamoDB vs DSQL timings and prints stats. The write benchmark uses temporary benchmark-only records, then deletes them before the suite continues.
+Each scenario records timings with `process.hrtime.bigint()`, validates equivalent result shapes where both systems are timed, prints median/mean/P95/P99/CV, and ends with an architect-focused takeaway. The final summary states which engine fits each workload and the decision rule behind the recommendation.
 
 ---
 

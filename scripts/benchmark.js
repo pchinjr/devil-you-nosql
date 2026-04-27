@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 
 require('dotenv').config();
-const { DynamoDBClient, QueryCommand, BatchGetItemCommand, TransactWriteItemsCommand, BatchWriteItemCommand } = require('@aws-sdk/client-dynamodb');
+const {
+  BatchGetItemCommand,
+  BatchWriteItemCommand,
+  DynamoDBClient,
+  QueryCommand,
+  ScanCommand,
+  TransactWriteItemsCommand
+} = require('@aws-sdk/client-dynamodb');
 const { DsqlSigner } = require('@aws-sdk/dsql-signer');
 const { Client } = require('pg');
 
@@ -9,20 +16,39 @@ const DSQL_ENDPOINT = process.env.DSQL_ENDPOINT;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const TABLE_NAME = process.env.TABLE_NAME || 'DevilSoulTracker';
 
+const LOCATIONS = [
+  'Highway_66',
+  'Desert_Crossroads',
+  'Abandoned_Church',
+  'City_Alley',
+  'Graveyard',
+  'Hell_Gate'
+];
+
 const dynamodb = new DynamoDBClient({ region: AWS_REGION });
 
 class BenchmarkSuite {
-  constructor() {
+  constructor(options = {}) {
+    this.config = {
+      profileIterations: coercePositiveInt(options.profileIterations) ?? coercePositiveInt(options.iterations) ?? 100,
+      analyticsIterations: coercePositiveInt(options.analyticsIterations) ?? coercePositiveInt(options.iterations) ?? 50,
+      batchIterations: coercePositiveInt(options.batchIterations) ?? coercePositiveInt(options.iterations) ?? 50,
+      writeIterations: coercePositiveInt(options.writeIterations) ?? Math.min(coercePositiveInt(options.iterations) ?? 30, 50),
+      complexIterations: coercePositiveInt(options.complexIterations) ?? Math.min(coercePositiveInt(options.iterations) ?? 25, 50),
+      batchSize: coercePositiveInt(options.batchSize) ?? 8
+    };
     this.dsqlClient = null;
+    this.results = [];
   }
 
   async connectDSQL() {
-    const signer = new DsqlSigner({ 
-      hostname: DSQL_ENDPOINT,
-      region: AWS_REGION 
-    });
+    if (!DSQL_ENDPOINT) {
+      throw new Error('DSQL_ENDPOINT must be set');
+    }
+
+    const signer = new DsqlSigner({ hostname: DSQL_ENDPOINT, region: AWS_REGION });
     const token = await signer.getDbConnectAdminAuthToken();
-    
+
     this.dsqlClient = new Client({
       host: DSQL_ENDPOINT,
       port: 5432,
@@ -31,250 +57,152 @@ class BenchmarkSuite {
       database: 'postgres',
       ssl: { rejectUnauthorized: false }
     });
-    
+
     await this.dsqlClient.connect();
   }
 
   async runBenchmark() {
-    console.log('🏁 COMPREHENSIVE BENCHMARK SUITE');
-    console.log('==================================');
-    console.log('📊 Enhanced statistical analysis with larger sample sizes\n');
+    console.log('=== ARCHITECTURE BENCHMARK SUITE ===');
+    console.log(`AWS Region: ${AWS_REGION}`);
+    console.log(`DynamoDB Table: ${TABLE_NAME}`);
+    console.log(`DSQL Endpoint: ${DSQL_ENDPOINT}`);
+    console.log('Goal: compare equivalent result shapes and label the architectural trade-off.\n');
 
     await this.connectDSQL();
-    await this.warmupConnections();
 
-    // Get sample data for benchmarks
-    const soulId = await this.getSampleSoulId();
-    const multipleSoulIds = await this.getMultipleSoulIds(10);
+    try {
+      await this.warmupConnections();
+      const soulIds = await this.getComparableSoulIds(Math.max(this.config.batchSize, 10));
+      const sampleSoulId = soulIds[0];
 
-    // Benchmark 1: User Profile Retrieval (100 iterations)
-    await this.benchmarkUserProfiles(soulId, 100);
+      await this.benchmarkProfileRead(sampleSoulId, this.config.profileIterations);
+      await this.benchmarkLocationAnalytics(this.config.analyticsIterations);
+      await this.benchmarkBatchContracts(soulIds.slice(0, this.config.batchSize), this.config.batchIterations);
+      await this.benchmarkWriteBundle(this.config.writeIterations);
+      await this.benchmarkComplexAnalytics(this.config.complexIterations);
 
-    // Benchmark 2: Analytics Queries (50 iterations)
-    await this.benchmarkAnalytics(50);
-
-    // Benchmark 3: Batch Operations (50 iterations)
-    await this.benchmarkBatchOperations(multipleSoulIds, 50);
-
-    // Benchmark 4: Write Operations (30 iterations)
-    await this.benchmarkWriteOperations(30);
-
-    // Benchmark 5: Complex Analytics (25 iterations)
-    await this.benchmarkComplexAnalytics(25);
-
-    await this.dsqlClient.end();
-    console.log('\n🎯 BENCHMARK COMPLETE - Enhanced statistical confidence achieved!');
+      this.printExecutiveSummary();
+    } finally {
+      await this.dsqlClient.end();
+    }
   }
 
   async warmupConnections() {
-    console.log('🔥 Warming up connections...');
-    // DynamoDB warmup
+    console.log('Warming up clients...');
     try {
-      await dynamodb.send(new QueryCommand({
-        TableName: TABLE_NAME,
-        KeyConditionExpression: 'PK = :pk',
-        ExpressionAttributeValues: { ':pk': 'WARMUP' },
-        Limit: 1
-      }));
-    } catch (e) { /* ignore */ }
-
-    // DSQL warmup
-    try {
-      await this.dsqlClient.query('SELECT 1 LIMIT 1');
-    } catch (e) { /* ignore */ }
-    
-    console.log('✅ Warmup complete\n');
+      await dynamodb.send(new ScanCommand({ TableName: TABLE_NAME, Limit: 1 }));
+    } catch {
+      // Ignore warmup failure; the real scenarios will report errors.
+    }
+    await this.dsqlClient.query('SELECT 1');
+    console.log('Warmup complete.\n');
   }
 
-  async benchmarkUserProfiles(soulId, iterations) {
-    console.log(`📋 BENCHMARK 1: User Profile Retrieval (${iterations} iterations)`);
-    console.log('   🎯 Scenario: Mobile app loading complete user profile');
-    console.log('   📊 Enhanced sample size for robust statistical analysis\n');
+  async benchmarkProfileRead(soulId, iterations) {
+    console.log(`1. Complete Profile Read (${iterations} iterations)`);
+    console.log('   Workload: fetch one contract plus its event and ledger history.');
+    console.log('   DynamoDB shape: one partition query.');
+    console.log('   DSQL shape: three indexed relational queries normalized to the same profile.\n');
 
     const dynamoTimes = [];
     const dsqlTimes = [];
 
     for (let i = 0; i < iterations; i++) {
-      // DynamoDB query
-      const dynamoStart = process.hrtime.bigint();
-      const dynamoResult = await dynamodb.send(new QueryCommand({
-        TableName: TABLE_NAME,
-        KeyConditionExpression: 'PK = :pk',
-        ExpressionAttributeValues: { ':pk': { S: `SOUL#${soulId}` } }
-      }));
-      const dynamoTime = Number(process.hrtime.bigint() - dynamoStart) / 1000000;
-      dynamoTimes.push(dynamoTime);
+      const dynamo = await timeAsync(() => this.fetchDynamoProfile(soulId));
+      const dsql = await timeAsync(() => this.fetchDsqlProfile(soulId));
 
-      // DSQL query
-      const dsqlStart = process.hrtime.bigint();
-      const dsqlResult = await this.dsqlClient.query(`
-        SELECT sc.*,
-               array_agg(sce.description) as events,
-               sum(sl.amount) as total_power
-        FROM soul_contracts sc
-        LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id  
-        LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
-        WHERE sc.id = $1
-        GROUP BY sc.id, sc.contract_status, sc.soul_type, sc.contract_location, sc.updated_at
-      `, [soulId]);
-      const dsqlTime = Number(process.hrtime.bigint() - dsqlStart) / 1000000;
-      dsqlTimes.push(dsqlTime);
-
-      // Progress indicator
-      if ((i + 1) % 20 === 0) {
-        console.log(`   Progress: ${i + 1}/${iterations} iterations completed`);
+      if (i === 0) {
+        assertProfileShape(dynamo.value, dsql.value, soulId);
       }
+
+      dynamoTimes.push(dynamo.ms);
+      dsqlTimes.push(dsql.ms);
+      this.logProgress(i + 1, iterations);
     }
 
-    const dynamoStats = this.calculateAdvancedStats(dynamoTimes);
-    const dsqlStats = this.calculateAdvancedStats(dsqlTimes);
-    const tTest = this.performTTest(dynamoTimes, dsqlTimes);
-
-    console.log(`\n📊 USER PROFILE RESULTS (${iterations} samples):`);
-    console.log(`🔥 DynamoDB: ${dynamoStats.mean.toFixed(1)}ms ± ${dynamoStats.ci95.toFixed(1)}ms`);
-    console.log(`   Range: ${dynamoStats.min.toFixed(1)}-${dynamoStats.max.toFixed(1)}ms`);
-    console.log(`   P50: ${dynamoStats.p50.toFixed(1)}ms, P95: ${dynamoStats.p95.toFixed(1)}ms, P99: ${dynamoStats.p99.toFixed(1)}ms`);
-    console.log(`   CV: ${dynamoStats.cv.toFixed(1)}% (${this.interpretConsistency(dynamoStats.cv)})`);
-    
-    console.log(`⚡ DSQL: ${dsqlStats.mean.toFixed(1)}ms ± ${dsqlStats.ci95.toFixed(1)}ms`);
-    console.log(`   Range: ${dsqlStats.min.toFixed(1)}-${dsqlStats.max.toFixed(1)}ms`);
-    console.log(`   P50: ${dsqlStats.p50.toFixed(1)}ms, P95: ${dsqlStats.p95.toFixed(1)}ms, P99: ${dsqlStats.p99.toFixed(1)}ms`);
-    console.log(`   CV: ${dsqlStats.cv.toFixed(1)}% (${this.interpretConsistency(dsqlStats.cv)})`);
-
-    console.log(`\n📈 STATISTICAL ANALYSIS:`);
-    console.log(`   Performance ratio: ${(dsqlStats.mean / dynamoStats.mean).toFixed(2)}x`);
-    console.log(`   Statistical significance: ${tTest.significant ? 'YES' : 'NO'} (p=${tTest.pValue.toFixed(4)})`);
-    console.log(`   Effect size: ${tTest.effectSize.toFixed(2)} (${this.interpretEffectSize(tTest.effectSize)})`);
-    console.log(`   Confidence: ${iterations >= 100 ? 'HIGH' : iterations >= 50 ? 'MEDIUM' : 'LOW'} (n=${iterations})`);
+    this.recordComparison({
+      name: 'Complete profile read',
+      workload: 'Key-local operational read',
+      dynamoStats: calculateStats(dynamoTimes),
+      dsqlStats: calculateStats(dsqlTimes),
+      takeaway: 'DynamoDB should usually win when the access pattern is a single known partition; DSQL remains competitive when indexed and result sizes are small.'
+    });
   }
 
-  async benchmarkAnalytics(iterations) {
-    console.log(`\n📊 BENCHMARK 2: Business Analytics (${iterations} iterations)`);
-    console.log('   🎯 Scenario: Executive dashboard loading business metrics');
-    console.log('   📈 Comparing single SQL query vs multiple DynamoDB operations\n');
+  async benchmarkLocationAnalytics(iterations) {
+    console.log(`\n2. Location Analytics (${iterations} iterations)`);
+    console.log('   Workload: count contracts, redeemed contracts, and ledger totals by location.');
+    console.log('   DynamoDB shape: scan/query operational items and aggregate client-side.');
+    console.log('   DSQL shape: one grouped SQL query.\n');
 
-    const dsqlTimes = [];
     const dynamoTimes = [];
+    const dsqlTimes = [];
 
     for (let i = 0; i < iterations; i++) {
-      // DSQL analytics query
-      const dsqlStart = Date.now();
-      await this.dsqlClient.query(`
-        SELECT 
-          sc.contract_location,
-          COUNT(*) as soul_count,
-          COUNT(CASE WHEN sc.contract_status = 'Redeemed' THEN 1 END) as redeemed,
-          SUM(COALESCE(sl.amount, 0)) as total_power,
-          AVG(COALESCE(sl.amount, 0)) as avg_power_per_soul,
-          ROUND(COUNT(CASE WHEN sc.contract_status = 'Redeemed' THEN 1 END) * 100.0 / COUNT(*), 1) as redemption_rate
-        FROM soul_contracts sc
-        LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
-        GROUP BY sc.contract_location
-        ORDER BY total_power DESC
-      `);
-      const dsqlTime = Date.now() - dsqlStart;
-      dsqlTimes.push(dsqlTime);
+      const dynamo = await timeAsync(() => this.fetchDynamoLocationAnalytics());
+      const dsql = await timeAsync(() => this.fetchDsqlLocationAnalytics());
 
-      // DynamoDB equivalent (simplified for benchmark)
-      const dynamoStart = Date.now();
-      const locations = ['Highway_66', 'Desert_Crossroads', 'Abandoned_Church', 'City_Alley', 'Graveyard', 'Hell_Gate'];
-      for (const location of locations) {
-        await dynamodb.send(new QueryCommand({
-          TableName: TABLE_NAME,
-          IndexName: 'LocationIndex',
-          KeyConditionExpression: 'contract_location = :location',
-          ExpressionAttributeValues: { ':location': { S: location } }
-        }));
+      if (i === 0) {
+        assertAnalyticsShape(dynamo.value, dsql.value);
       }
-      const dynamoTime = Date.now() - dynamoStart;
-      dynamoTimes.push(dynamoTime);
 
-      if ((i + 1) % 10 === 0) {
-        console.log(`   Progress: ${i + 1}/${iterations} iterations completed`);
-      }
+      dynamoTimes.push(dynamo.ms);
+      dsqlTimes.push(dsql.ms);
+      this.logProgress(i + 1, iterations);
     }
 
-    const dsqlStats = this.calculateAdvancedStats(dsqlTimes);
-    const dynamoStats = this.calculateAdvancedStats(dynamoTimes);
-
-    console.log(`\n📊 ANALYTICS RESULTS (${iterations} samples):`);
-    console.log(`⚡ DSQL: ${dsqlStats.mean.toFixed(1)}ms ± ${dsqlStats.ci95.toFixed(1)}ms`);
-    console.log(`   P95: ${dsqlStats.p95.toFixed(1)}ms, CV: ${dsqlStats.cv.toFixed(1)}%`);
-    console.log(`🔥 DynamoDB: ${dynamoStats.mean.toFixed(1)}ms ± ${dynamoStats.ci95.toFixed(1)}ms`);
-    console.log(`   P95: ${dynamoStats.p95.toFixed(1)}ms, CV: ${dynamoStats.cv.toFixed(1)}%`);
-    console.log(`📈 Performance ratio: ${(dynamoStats.mean / dsqlStats.mean).toFixed(1)}x slower (DynamoDB)`);
+    this.recordComparison({
+      name: 'Location analytics',
+      workload: 'Cross-partition aggregation',
+      dynamoStats: calculateStats(dynamoTimes),
+      dsqlStats: calculateStats(dsqlTimes),
+      takeaway: 'DSQL is the cleaner architectural fit for ad hoc relational analytics; DynamoDB needs a precomputed aggregate, stream pipeline, or client-side fan-out.'
+    });
   }
 
-  async benchmarkBatchOperations(soulIds, iterations) {
-    console.log(`\n🔥 BENCHMARK 3: Batch Operations (${iterations} iterations)`);
-    console.log('   🎯 Scenario: Admin dashboard loading multiple contracts');
-    console.log('   📦 Comparing batch APIs vs individual queries\n');
+  async benchmarkBatchContracts(soulIds, iterations) {
+    console.log(`\n3. Batch Contract Fetch (${iterations} iterations)`);
+    console.log(`   Workload: fetch ${soulIds.length} contracts by ID.`);
+    console.log('   DynamoDB shape: BatchGetItem.');
+    console.log('   DSQL shape: primary-key IN query.\n');
 
-    const dynamoBatchTimes = [];
-    const dsqlBatchTimes = [];
+    if (soulIds.length === 0) {
+      throw new Error('No comparable soul IDs found for batch benchmark');
+    }
+
+    const dynamoTimes = [];
+    const dsqlTimes = [];
     const dynamoIndividualTimes = [];
 
     for (let i = 0; i < iterations; i++) {
-      // DynamoDB BatchGet
-      const dynamoBatchStart = Date.now();
-      await dynamodb.send(new BatchGetItemCommand({
-        RequestItems: {
-          [TABLE_NAME]: {
-            Keys: soulIds.slice(0, 8).map(id => ({
-              PK: { S: `SOUL#${id}` },
-              SK: { S: 'CONTRACT' }
-            }))
-          }
-        }
-      }));
-      const dynamoBatchTime = Date.now() - dynamoBatchStart;
-      dynamoBatchTimes.push(dynamoBatchTime);
+      const dynamo = await timeAsync(() => this.fetchDynamoContractsBatch(soulIds));
+      const dsql = await timeAsync(() => this.fetchDsqlContractsBatch(soulIds));
+      const dynamoIndividual = await timeAsync(() => this.fetchDynamoContractsIndividually(soulIds));
 
-      // DSQL batch with IN clause
-      const dsqlBatchStart = Date.now();
-      await this.dsqlClient.query(
-        'SELECT * FROM soul_contracts WHERE id = ANY($1::text[])',
-        [soulIds.slice(0, 8)]
-      );
-      const dsqlBatchTime = Date.now() - dsqlBatchStart;
-      dsqlBatchTimes.push(dsqlBatchTime);
-
-      // DynamoDB individual queries (for comparison)
-      const dynamoIndividualStart = Date.now();
-      for (const soulId of soulIds.slice(0, 8)) {
-        await dynamodb.send(new QueryCommand({
-          TableName: TABLE_NAME,
-          KeyConditionExpression: 'PK = :pk AND SK = :sk',
-          ExpressionAttributeValues: {
-            ':pk': { S: `SOUL#${soulId}` },
-            ':sk': { S: 'CONTRACT' }
-          }
-        }));
+      if (i === 0) {
+        assertSameIds(dynamo.value, dsql.value, 'batch contracts');
       }
-      const dynamoIndividualTime = Date.now() - dynamoIndividualStart;
-      dynamoIndividualTimes.push(dynamoIndividualTime);
 
-      if ((i + 1) % 10 === 0) {
-        console.log(`   Progress: ${i + 1}/${iterations} iterations completed`);
-      }
+      dynamoTimes.push(dynamo.ms);
+      dsqlTimes.push(dsql.ms);
+      dynamoIndividualTimes.push(dynamoIndividual.ms);
+      this.logProgress(i + 1, iterations);
     }
 
-    const dynamoBatchStats = this.calculateAdvancedStats(dynamoBatchTimes);
-    const dsqlBatchStats = this.calculateAdvancedStats(dsqlBatchTimes);
-    const dynamoIndividualStats = this.calculateAdvancedStats(dynamoIndividualTimes);
-
-    console.log(`\n📦 BATCH OPERATIONS RESULTS (${iterations} samples):`);
-    console.log(`🥇 DSQL IN clause: ${dsqlBatchStats.mean.toFixed(1)}ms ± ${dsqlBatchStats.ci95.toFixed(1)}ms`);
-    console.log(`🥈 DynamoDB BatchGet: ${dynamoBatchStats.mean.toFixed(1)}ms ± ${dynamoBatchStats.ci95.toFixed(1)}ms`);
-    console.log(`🥉 DynamoDB Individual: ${dynamoIndividualStats.mean.toFixed(1)}ms ± ${dynamoIndividualStats.ci95.toFixed(1)}ms`);
-    console.log(`📈 Batch efficiency: ${(dynamoIndividualStats.mean / dynamoBatchStats.mean).toFixed(1)}x faster`);
+    this.recordComparison({
+      name: 'Batch contract fetch',
+      workload: 'Multiple key lookups',
+      dynamoStats: calculateStats(dynamoTimes),
+      dsqlStats: calculateStats(dsqlTimes),
+      extra: `DynamoDB individual-key baseline median: ${calculateStats(dynamoIndividualTimes).median.toFixed(1)}ms`,
+      takeaway: 'Both systems handle key batches well. DynamoDB BatchGet avoids repeated round trips; DSQL keeps the query compact and composable.'
+    });
   }
 
-  async benchmarkWriteOperations(iterations) {
-    console.log(`\n✍️  BENCHMARK 4: Write Operations (${iterations} iterations)`);
-    console.log('   🎯 Scenario: Transaction processing for soul contract updates');
-    console.log('   💾 Comparing transaction performance and consistency');
-    console.log('   🧹 Uses throwaway benchmark records and cleans them up after the run\n');
+  async benchmarkWriteBundle(iterations) {
+    console.log(`\n4. Transactional Write Bundle (${iterations} iterations)`);
+    console.log('   Workload: update one contract and append one event atomically.');
+    console.log('   Data safety: benchmark-only records are created before timing and deleted afterward.\n');
 
     const dynamoTimes = [];
     const dsqlTimes = [];
@@ -288,93 +216,197 @@ class BenchmarkSuite {
         const dynamoSoulId = `${runId}_dynamo_${i}`;
         const dsqlSoulId = `${runId}_dsql_${i}`;
 
-        // DynamoDB transaction
-        const dynamoStart = Date.now();
-        try {
-          await dynamodb.send(new TransactWriteItemsCommand({
-            TransactItems: [
-              {
-                Update: {
-                  TableName: TABLE_NAME,
-                  Key: {
-                    PK: { S: `SOUL#${dynamoSoulId}` },
-                    SK: { S: 'CONTRACT' }
-                  },
-                  UpdateExpression: 'SET updated_at = :timestamp',
-                  ExpressionAttributeValues: { ':timestamp': { S: timestamp } }
-                }
-              },
-              {
-                Put: {
-                  TableName: TABLE_NAME,
-                  Item: {
-                    PK: { S: `SOUL#${dynamoSoulId}` },
-                    SK: { S: `EVENT#${timestamp}` },
-                    description: { S: `Benchmark event ${i}` },
-                    timestamp: { S: timestamp }
-                  }
-                }
-              }
-            ]
-          }));
-          const dynamoTime = Date.now() - dynamoStart;
-          dynamoTimes.push(dynamoTime);
-        } catch (error) {
-          console.log(`   ⚠️ DynamoDB transaction ${i} failed: ${error.message}`);
-        }
+        const dynamo = await timeAsync(() => this.writeDynamoBundle(dynamoSoulId, timestamp, i));
+        const dsql = await timeAsync(() => this.writeDsqlBundle(dsqlSoulId, timestamp, i));
 
-        // DSQL transaction
-        const dsqlStart = Date.now();
-        try {
-          await this.dsqlClient.query('BEGIN');
-          await this.dsqlClient.query(
-            'UPDATE soul_contracts SET updated_at = $1 WHERE id = $2',
-            [timestamp, dsqlSoulId]
-          );
-          await this.dsqlClient.query(
-            'INSERT INTO soul_contract_events (soul_contract_id, description, event_time) VALUES ($1, $2, $3)',
-            [dsqlSoulId, `Benchmark event ${i}`, timestamp]
-          );
-          await this.dsqlClient.query('COMMIT');
-          const dsqlTime = Date.now() - dsqlStart;
-          dsqlTimes.push(dsqlTime);
-        } catch (error) {
-          await this.dsqlClient.query('ROLLBACK');
-          console.log(`   ⚠️ DSQL transaction ${i} failed: ${error.message}`);
-        }
-
-        if ((i + 1) % 10 === 0) {
-          console.log(`   Progress: ${i + 1}/${iterations} iterations completed`);
-        }
+        dynamoTimes.push(dynamo.ms);
+        dsqlTimes.push(dsql.ms);
+        this.logProgress(i + 1, iterations);
       }
     } finally {
       await this.cleanupBenchmarkWrites(runId, iterations);
     }
 
-    const dynamoStats = this.calculateAdvancedStats(dynamoTimes);
-    const dsqlStats = this.calculateAdvancedStats(dsqlTimes);
-
-    console.log(`\n💾 WRITE OPERATIONS RESULTS (${iterations} samples):`);
-    if (dynamoTimes.length > 0) {
-      console.log(`🔥 DynamoDB: ${dynamoStats.mean.toFixed(1)}ms ± ${dynamoStats.ci95.toFixed(1)}ms`);
-      console.log(`   P95: ${dynamoStats.p95.toFixed(1)}ms, CV: ${dynamoStats.cv.toFixed(1)}% (${this.interpretConsistency(dynamoStats.cv)})`);
-    } else {
-      console.log(`🔥 DynamoDB: No successful transactions (all failed)`);
-    }
-    
-    if (dsqlTimes.length > 0) {
-      console.log(`⚡ DSQL: ${dsqlStats.mean.toFixed(1)}ms ± ${dsqlStats.ci95.toFixed(1)}ms`);
-      console.log(`   P95: ${dsqlStats.p95.toFixed(1)}ms, CV: ${dsqlStats.cv.toFixed(1)}% (${this.interpretConsistency(dsqlStats.cv)})`);
-      console.log(`📈 Consistency winner: ${dynamoStats.cv < dsqlStats.cv ? 'DynamoDB' : 'DSQL'}`);
-    } else {
-      console.log(`⚡ DSQL: No successful transactions (all failed)`);
-    }
+    this.recordComparison({
+      name: 'Transactional write bundle',
+      workload: 'Small ACID write',
+      dynamoStats: calculateStats(dynamoTimes),
+      dsqlStats: calculateStats(dsqlTimes),
+      takeaway: 'DynamoDB transactions are a strong fit for small partition-oriented writes. DSQL buys relational semantics and SQL constraints at a usually higher write latency.'
+    });
   }
 
-  async cleanupBenchmarkWrites(runId, iterations) {
-    console.log('   🧹 Cleaning up write benchmark records...');
-    await this.cleanupDynamoBenchmarkWrites(runId, iterations);
-    await this.cleanupDsqlBenchmarkWrites(runId);
+  async benchmarkComplexAnalytics(iterations) {
+    console.log(`\n5. Complex SQL Analytics (${iterations} iterations)`);
+    console.log('   Workload: grouped metrics with ranking/window functions.');
+    console.log('   DynamoDB comparison: intentionally not timed because an equivalent query requires a different data product or client-side analytical pipeline.\n');
+
+    const dsqlTimes = [];
+    for (let i = 0; i < iterations; i++) {
+      const dsql = await timeAsync(() => this.fetchDsqlComplexAnalytics());
+      dsqlTimes.push(dsql.ms);
+      this.logProgress(i + 1, iterations);
+    }
+
+    const stats = calculateStats(dsqlTimes);
+    console.log('\nComplex SQL analytics results');
+    printStats('DSQL', stats);
+    console.log('Architectural takeaway: use SQL/DSQL when the business needs flexible analytics on normalized relationships. DynamoDB can support this only with deliberate aggregate tables, streams, or a warehouse-style read model.\n');
+
+    this.results.push({
+      name: 'Complex SQL analytics',
+      workload: 'Relational BI query',
+      dsqlStats: stats,
+      winner: 'DSQL',
+      ratio: null,
+      takeaway: 'DSQL is the definite fit for windowed/ad hoc relational analytics unless DynamoDB is paired with a purpose-built analytical projection.'
+    });
+  }
+
+  async fetchDynamoProfile(soulId) {
+    const result = await dynamodb.send(new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: 'PK = :pk',
+      ExpressionAttributeValues: {
+        ':pk': { S: `SOUL#${soulId}` }
+      },
+      ScanIndexForward: true
+    }));
+
+    const items = result.Items || [];
+    return {
+      soulId,
+      contracts: items.filter(item => item.SK?.S === 'CONTRACT').length,
+      events: items.filter(item => item.SK?.S?.startsWith('EVENT#')).length,
+      ledgerEntries: items.filter(item => item.SK?.S?.startsWith('LEDGER#')).length,
+      totalLedger: items
+        .filter(item => item.SK?.S?.startsWith('LEDGER#'))
+        .reduce((sum, item) => sum + Number(item.amount?.N || 0), 0)
+    };
+  }
+
+  async fetchDsqlProfile(soulId) {
+    const [contract, events, ledger] = await Promise.all([
+      this.dsqlClient.query('SELECT id FROM soul_contracts WHERE id = $1', [soulId]),
+      this.dsqlClient.query('SELECT id FROM soul_contract_events WHERE soul_contract_id = $1', [soulId]),
+      this.dsqlClient.query('SELECT amount FROM soul_ledger WHERE soul_contract_id = $1', [soulId])
+    ]);
+
+    return {
+      soulId,
+      contracts: contract.rowCount,
+      events: events.rowCount,
+      ledgerEntries: ledger.rowCount,
+      totalLedger: ledger.rows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    };
+  }
+
+  async fetchDynamoLocationAnalytics() {
+    const [contracts, ledgerEntries] = await Promise.all([
+      scanAll({
+        TableName: TABLE_NAME,
+        FilterExpression: 'SK = :sk',
+        ExpressionAttributeValues: {
+          ':sk': { S: 'CONTRACT' }
+        }
+      }),
+      scanAll({
+        TableName: TABLE_NAME,
+        FilterExpression: 'begins_with(SK, :ledgerPrefix)',
+        ExpressionAttributeValues: {
+          ':ledgerPrefix': { S: 'LEDGER#' }
+        }
+      })
+    ]);
+
+    const contractBySoul = new Map();
+    const byLocation = new Map(LOCATIONS.map(location => [location, {
+      location,
+      soulCount: 0,
+      redeemed: 0,
+      totalPower: 0
+    }]));
+
+    for (const item of contracts) {
+      const soulId = item.soulId?.S || item.PK?.S?.replace('SOUL#', '');
+      const location = item.contract_location?.S || 'Unknown';
+      const status = item.status?.S || item.contract_status?.S || 'Unknown';
+      contractBySoul.set(soulId, { location, status });
+      if (!byLocation.has(location)) {
+        byLocation.set(location, { location, soulCount: 0, redeemed: 0, totalPower: 0 });
+      }
+      const bucket = byLocation.get(location);
+      bucket.soulCount += 1;
+      if (status === 'Redeemed') bucket.redeemed += 1;
+    }
+
+    for (const item of ledgerEntries) {
+      const soulId = item.PK?.S?.replace('SOUL#', '');
+      const contract = contractBySoul.get(soulId);
+      if (!contract) continue;
+      byLocation.get(contract.location).totalPower += Number(item.amount?.N || 0);
+    }
+
+    return normalizeAnalyticsRows(Array.from(byLocation.values()));
+  }
+
+  async fetchDsqlLocationAnalytics() {
+    const result = await this.dsqlClient.query(`
+      SELECT
+        sc.contract_location AS location,
+        COUNT(DISTINCT sc.id)::int AS soul_count,
+        COUNT(DISTINCT CASE WHEN sc.contract_status = 'Redeemed' THEN sc.id END)::int AS redeemed,
+        COALESCE(SUM(sl.amount), 0)::numeric AS total_power
+      FROM soul_contracts sc
+      LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
+      GROUP BY sc.contract_location
+      ORDER BY sc.contract_location
+    `);
+
+    return normalizeAnalyticsRows(result.rows.map(row => ({
+      location: row.location,
+      soulCount: Number(row.soul_count),
+      redeemed: Number(row.redeemed),
+      totalPower: Number(row.total_power)
+    })));
+  }
+
+  async fetchDynamoContractsBatch(soulIds) {
+    const result = await dynamodb.send(new BatchGetItemCommand({
+      RequestItems: {
+        [TABLE_NAME]: {
+          Keys: soulIds.map(id => ({
+            PK: { S: `SOUL#${id}` },
+            SK: { S: 'CONTRACT' }
+          }))
+        }
+      }
+    }));
+    return (result.Responses?.[TABLE_NAME] || []).map(item => item.soulId?.S).sort();
+  }
+
+  async fetchDynamoContractsIndividually(soulIds) {
+    const ids = [];
+    for (const soulId of soulIds) {
+      const result = await dynamodb.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: 'PK = :pk AND SK = :sk',
+        ExpressionAttributeValues: {
+          ':pk': { S: `SOUL#${soulId}` },
+          ':sk': { S: 'CONTRACT' }
+        }
+      }));
+      ids.push(...(result.Items || []).map(item => item.soulId?.S));
+    }
+    return ids.sort();
+  }
+
+  async fetchDsqlContractsBatch(soulIds) {
+    const result = await this.dsqlClient.query(
+      'SELECT id FROM soul_contracts WHERE id = ANY($1::text[]) ORDER BY id',
+      [soulIds]
+    );
+    return result.rows.map(row => row.id).sort();
   }
 
   async setupBenchmarkWriteRecords(runId, iterations) {
@@ -400,20 +432,7 @@ class BenchmarkSuite {
       });
     }
 
-    for (let i = 0; i < dynamoRequests.length; i += 25) {
-      let requests = dynamoRequests.slice(i, i + 25);
-      while (requests.length > 0) {
-        const response = await dynamodb.send(new BatchWriteItemCommand({
-          RequestItems: {
-            [TABLE_NAME]: requests
-          }
-        }));
-        requests = response.UnprocessedItems?.[TABLE_NAME] || [];
-        if (requests.length > 0) {
-          await wait(250);
-        }
-      }
-    }
+    await batchWriteAll(dynamoRequests);
 
     await this.dsqlClient.query('BEGIN');
     try {
@@ -431,9 +450,58 @@ class BenchmarkSuite {
     }
   }
 
-  async cleanupDynamoBenchmarkWrites(runId, iterations) {
-    const deleteRequests = [];
+  async writeDynamoBundle(soulId, timestamp, index) {
+    await dynamodb.send(new TransactWriteItemsCommand({
+      TransactItems: [
+        {
+          Update: {
+            TableName: TABLE_NAME,
+            Key: {
+              PK: { S: `SOUL#${soulId}` },
+              SK: { S: 'CONTRACT' }
+            },
+            UpdateExpression: 'SET updated_at = :timestamp',
+            ExpressionAttributeValues: {
+              ':timestamp': { S: timestamp }
+            }
+          }
+        },
+        {
+          Put: {
+            TableName: TABLE_NAME,
+            Item: {
+              PK: { S: `SOUL#${soulId}` },
+              SK: { S: `EVENT#${timestamp}` },
+              description: { S: `Benchmark event ${index}` },
+              timestamp: { S: timestamp }
+            }
+          }
+        }
+      ]
+    }));
+  }
 
+  async writeDsqlBundle(soulId, timestamp, index) {
+    await this.dsqlClient.query('BEGIN');
+    try {
+      await this.dsqlClient.query(
+        'UPDATE soul_contracts SET updated_at = $1 WHERE id = $2',
+        [timestamp, soulId]
+      );
+      await this.dsqlClient.query(
+        'INSERT INTO soul_contract_events (soul_contract_id, description, event_time) VALUES ($1, $2, $3)',
+        [soulId, `Benchmark event ${index}`, timestamp]
+      );
+      await this.dsqlClient.query('COMMIT');
+    } catch (error) {
+      await this.dsqlClient.query('ROLLBACK');
+      throw error;
+    }
+  }
+
+  async cleanupBenchmarkWrites(runId, iterations) {
+    console.log('   Cleaning up write benchmark records...');
+    const deleteRequests = [];
     for (let index = 0; index < iterations; index++) {
       const soulId = `${runId}_dynamo_${index}`;
       const result = await dynamodb.send(new QueryCommand({
@@ -443,9 +511,7 @@ class BenchmarkSuite {
           ':pk': { S: `SOUL#${soulId}` }
         }
       }));
-
-      const items = result.Items || [];
-      for (const item of items) {
+      for (const item of result.Items || []) {
         deleteRequests.push({
           DeleteRequest: {
             Key: {
@@ -456,215 +522,276 @@ class BenchmarkSuite {
         });
       }
     }
+    await batchWriteAll(deleteRequests);
 
-    for (let i = 0; i < deleteRequests.length; i += 25) {
-      let requests = deleteRequests.slice(i, i + 25);
-      while (requests.length > 0) {
-        const response = await dynamodb.send(new BatchWriteItemCommand({
-          RequestItems: {
-            [TABLE_NAME]: requests
-          }
-        }));
-        requests = response.UnprocessedItems?.[TABLE_NAME] || [];
-        if (requests.length > 0) {
-          await wait(250);
-        }
-      }
-    }
-  }
-
-  async cleanupDsqlBenchmarkWrites(runId) {
     const pattern = `${runId}_dsql_%`;
     await this.dsqlClient.query('DELETE FROM soul_contract_events WHERE soul_contract_id LIKE $1', [pattern]);
     await this.dsqlClient.query('DELETE FROM soul_ledger WHERE soul_contract_id LIKE $1', [pattern]);
     await this.dsqlClient.query('DELETE FROM soul_contracts WHERE id LIKE $1', [pattern]);
   }
 
-  async benchmarkComplexAnalytics(iterations) {
-    console.log(`\n⚡ BENCHMARK 5: Complex Analytics (${iterations} iterations)`);
-    console.log('   🎯 Scenario: Advanced business intelligence queries');
-    console.log('   🧮 Testing DSQL\'s analytical capabilities\n');
-
-    const complexTimes = [];
-
-    for (let i = 0; i < iterations; i++) {
-      const complexStart = Date.now();
-      await this.dsqlClient.query(`
-        WITH location_stats AS (
-          SELECT 
-            sc.contract_location,
-            COUNT(*) as total_contracts,
-            COUNT(CASE WHEN sc.contract_status = 'Redeemed' THEN 1 END) as redeemed_count,
-            AVG(COALESCE(sl.amount, 0)) as avg_power
-          FROM soul_contracts sc
-          LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
-          GROUP BY sc.contract_location
-        )
-        SELECT 
+  async fetchDsqlComplexAnalytics() {
+    return this.dsqlClient.query(`
+      WITH soul_totals AS (
+        SELECT
+          sc.id,
+          sc.contract_location,
+          sc.contract_status,
+          COALESCE(SUM(sl.amount), 0) AS total_power,
+          COUNT(sce.id) AS event_count
+        FROM soul_contracts sc
+        LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
+        LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id
+        GROUP BY sc.id, sc.contract_location, sc.contract_status
+      ),
+      location_rollup AS (
+        SELECT
           contract_location,
-          total_contracts,
-          redeemed_count,
-          ROUND(redeemed_count * 100.0 / total_contracts, 1) as redemption_rate,
-          ROUND(avg_power, 2) as avg_net_power,
-          RANK() OVER (ORDER BY avg_power DESC) as profitability_rank,
-          CASE 
-            WHEN redeemed_count > 0 THEN 100.0
-            ELSE 0.0
-          END as activity_rate
-        FROM location_stats
-        ORDER BY profitability_rank
-      `);
-      const complexTime = Date.now() - complexStart;
-      complexTimes.push(complexTime);
+          COUNT(*) AS souls,
+          SUM(total_power) AS location_power,
+          AVG(event_count) AS avg_events,
+          COUNT(CASE WHEN contract_status = 'Redeemed' THEN 1 END) AS redeemed
+        FROM soul_totals
+        GROUP BY contract_location
+      )
+      SELECT
+        contract_location,
+        souls,
+        location_power,
+        ROUND(avg_events, 2) AS avg_events,
+        ROUND(redeemed * 100.0 / souls, 1) AS redemption_rate,
+        RANK() OVER (ORDER BY location_power DESC) AS power_rank
+      FROM location_rollup
+      ORDER BY power_rank
+    `);
+  }
 
-      if ((i + 1) % 5 === 0) {
-        console.log(`   Progress: ${i + 1}/${iterations} iterations completed`);
+  async getComparableSoulIds(count) {
+    const items = await scanAll({
+      TableName: TABLE_NAME,
+      FilterExpression: 'SK = :sk',
+      ExpressionAttributeValues: {
+        ':sk': { S: 'CONTRACT' }
+      }
+    });
+
+    const soulIds = [];
+    for (const item of items) {
+      const soulId = item.soulId?.S || item.PK?.S?.replace('SOUL#', '');
+      if (!soulId) continue;
+      const result = await this.dsqlClient.query('SELECT id FROM soul_contracts WHERE id = $1', [soulId]);
+      if (result.rowCount > 0) {
+        soulIds.push(soulId);
+      }
+      if (soulIds.length >= count) {
+        break;
       }
     }
 
-    const complexStats = this.calculateAdvancedStats(complexTimes);
-
-    console.log(`\n🧮 COMPLEX ANALYTICS RESULTS (${iterations} samples):`);
-    console.log(`⚡ DSQL: ${complexStats.mean.toFixed(1)}ms ± ${complexStats.ci95.toFixed(1)}ms`);
-    console.log(`   P95: ${complexStats.p95.toFixed(1)}ms, CV: ${complexStats.cv.toFixed(1)}%`);
-    console.log(`   🚫 DynamoDB equivalent: Would require extensive client-side processing`);
-    console.log(`   💡 Demonstrates DSQL's strength in analytical workloads`);
-  }
-
-  calculateAdvancedStats(times) {
-    if (times.length === 0) {
-      return {
-        mean: 0,
-        min: 0,
-        max: 0,
-        stdDev: 0,
-        cv: 0,
-        ci95: 0,
-        p50: 0,
-        p95: 0,
-        p99: 0
-      };
+    if (soulIds.length === 0) {
+      throw new Error('No comparable records found. Run npm run seed:small or npm run seed:large first.');
     }
 
-    const sorted = times.sort((a, b) => a - b);
-    const n = times.length;
-    const mean = times.reduce((a, b) => a + b, 0) / n;
-    const variance = times.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
-    const stdDev = Math.sqrt(variance);
-    const cv = (stdDev / mean) * 100;
-    
-    // Confidence interval (95%)
-    const tValue = 1.96; // Approximate for large samples
-    const ci95 = (tValue * stdDev) / Math.sqrt(n);
-    
-    return {
-      mean,
-      min: Math.min(...times),
-      max: Math.max(...times),
-      stdDev,
-      cv,
-      ci95,
-      p50: sorted[Math.floor(n * 0.5)],
-      p95: sorted[Math.floor(n * 0.95)],
-      p99: sorted[Math.floor(n * 0.99)]
-    };
+    return soulIds;
   }
 
-  performTTest(sample1, sample2) {
-    const n1 = sample1.length;
-    const n2 = sample2.length;
-    const mean1 = sample1.reduce((a, b) => a + b, 0) / n1;
-    const mean2 = sample2.reduce((a, b) => a + b, 0) / n2;
-    
-    const var1 = sample1.reduce((acc, val) => acc + Math.pow(val - mean1, 2), 0) / (n1 - 1);
-    const var2 = sample2.reduce((acc, val) => acc + Math.pow(val - mean2, 2), 0) / (n2 - 1);
-    
-    const pooledStdDev = Math.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2));
-    const tStat = Math.abs(mean1 - mean2) / (pooledStdDev * Math.sqrt(1/n1 + 1/n2));
-    const df = n1 + n2 - 2;
-    const pValue = this.approximatePValue(tStat, df);
-    const effectSize = Math.abs(mean1 - mean2) / pooledStdDev;
-    
-    return {
-      tStat,
-      pValue,
-      significant: pValue < 0.05,
-      effectSize
-    };
+  recordComparison(result) {
+    const ratio = result.dsqlStats.median / result.dynamoStats.median;
+    const winner = chooseWinner(result.dynamoStats, result.dsqlStats);
+    this.results.push({ ...result, ratio, winner });
+
+    console.log(`\n${result.name} results`);
+    printStats('DynamoDB', result.dynamoStats);
+    printStats('DSQL', result.dsqlStats);
+    if (result.extra) console.log(result.extra);
+    console.log(`Median ratio: DSQL is ${ratio.toFixed(2)}x DynamoDB median latency.`);
+    console.log(`Architectural takeaway: ${result.takeaway}`);
+    console.log(`Scenario winner: ${winner}\n`);
   }
 
-  approximatePValue(t, df) {
-    if (t > 3) return 0.001;
-    if (t > 2.5) return 0.01;
-    if (t > 2) return 0.05;
-    if (t > 1.5) return 0.1;
-    return 0.2;
+  printExecutiveSummary() {
+    console.log('\n=== ARCHITECT TAKEAWAYS ===');
+    for (const result of this.results) {
+      const ratioText = result.ratio ? ` (${result.ratio.toFixed(2)}x DSQL/DynamoDB median)` : '';
+      console.log(`- ${result.name}: ${result.winner}${ratioText}. ${result.takeaway}`);
+    }
+    console.log('\nDecision rule: choose DynamoDB for fixed, key-oriented operational paths; choose DSQL when query flexibility, joins, and analytics are first-class requirements. Mixed systems are justified when both workload families matter.');
   }
 
-  interpretEffectSize(d) {
-    if (d < 0.2) return 'negligible';
-    if (d < 0.5) return 'small';
-    if (d < 0.8) return 'medium';
-    return 'large';
+  logProgress(current, total) {
+    const interval = Math.max(1, Math.floor(total / 5));
+    if (current % interval === 0 || current === total) {
+      console.log(`   Progress: ${current}/${total}`);
+    }
   }
+}
 
-  interpretConsistency(cv) {
-    if (cv < 20) return 'Excellent';
-    if (cv < 40) return 'Good';
-    if (cv < 60) return 'Variable';
-    return 'Highly Variable';
-  }
-
-  async getSampleSoulId() {
-    const dynamoResult = await dynamodb.send(new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: 'StatusIndex',
-      KeyConditionExpression: '#status = :status',
-      ExpressionAttributeNames: { '#status': 'status' },
-      ExpressionAttributeValues: { ':status': { S: 'Bound' } },
-      Limit: 10
+async function scanAll(params) {
+  const items = [];
+  let lastEvaluatedKey;
+  do {
+    const result = await dynamodb.send(new ScanCommand({
+      ...params,
+      ExclusiveStartKey: lastEvaluatedKey
     }));
-    
-    if (dynamoResult.Items.length === 0) throw new Error('No sample data found');
-    
-    // Find a soul that exists in both databases
-    for (const item of dynamoResult.Items) {
-      const soulId = item.soulId.S;
-      try {
-        const dsqlCheck = await this.dsqlClient.query('SELECT id FROM soul_contracts WHERE id = $1', [soulId]);
-        if (dsqlCheck.rows.length > 0) {
-          return soulId;
+    items.push(...(result.Items || []));
+    lastEvaluatedKey = result.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
+  return items;
+}
+
+async function batchWriteAll(requests) {
+  for (let i = 0; i < requests.length; i += 25) {
+    let chunk = requests.slice(i, i + 25);
+    while (chunk.length > 0) {
+      const response = await dynamodb.send(new BatchWriteItemCommand({
+        RequestItems: {
+          [TABLE_NAME]: chunk
         }
-      } catch (error) {
-        continue;
+      }));
+      chunk = response.UnprocessedItems?.[TABLE_NAME] || [];
+      if (chunk.length > 0) {
+        await wait(250);
       }
     }
-    
-    return dynamoResult.Items[0].soulId.S;
+  }
+}
+
+async function timeAsync(fn) {
+  const start = process.hrtime.bigint();
+  const value = await fn();
+  const ms = Number(process.hrtime.bigint() - start) / 1e6;
+  return { value, ms };
+}
+
+function calculateStats(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const n = sorted.length;
+  const mean = sorted.reduce((sum, value) => sum + value, 0) / n;
+  const variance = n > 1
+    ? sorted.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / (n - 1)
+    : 0;
+  const stdDev = Math.sqrt(variance);
+  const median = percentile(sorted, 0.5);
+  const p95 = percentile(sorted, 0.95);
+  const p99 = percentile(sorted, 0.99);
+  const mad = percentile(sorted.map(value => Math.abs(value - median)).sort((a, b) => a - b), 0.5);
+
+  return {
+    n,
+    mean,
+    median,
+    min: sorted[0],
+    max: sorted[n - 1],
+    stdDev,
+    mad,
+    cv: mean === 0 ? 0 : (stdDev / mean) * 100,
+    ci95: n > 1 ? (1.96 * stdDev) / Math.sqrt(n) : 0,
+    p95,
+    p99
+  };
+}
+
+function percentile(sorted, p) {
+  if (sorted.length === 0) return 0;
+  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1);
+  return sorted[index];
+}
+
+function printStats(label, stats) {
+  console.log(`${label}: median ${stats.median.toFixed(1)}ms, mean ${stats.mean.toFixed(1)}ms ± ${stats.ci95.toFixed(1)}ms, p95 ${stats.p95.toFixed(1)}ms, p99 ${stats.p99.toFixed(1)}ms, CV ${stats.cv.toFixed(1)}%, n=${stats.n}`);
+}
+
+function chooseWinner(dynamoStats, dsqlStats) {
+  const medianRatio = dsqlStats.median / dynamoStats.median;
+  const p95Ratio = dsqlStats.p95 / dynamoStats.p95;
+
+  if (medianRatio <= 0.85 && p95Ratio <= 1.15) return 'DSQL';
+  if (medianRatio >= 1.15 && p95Ratio >= 0.85) return 'DynamoDB';
+  return 'Workload-dependent';
+}
+
+function normalizeAnalyticsRows(rows) {
+  return rows
+    .map(row => ({
+      location: row.location,
+      soulCount: Number(row.soulCount || 0),
+      redeemed: Number(row.redeemed || 0),
+      totalPower: Number(row.totalPower || 0)
+    }))
+    .filter(row => row.soulCount > 0 || row.totalPower > 0)
+    .sort((a, b) => a.location.localeCompare(b.location));
+}
+
+function assertProfileShape(dynamo, dsql, soulId) {
+  const fields = ['contracts', 'events', 'ledgerEntries', 'totalLedger'];
+  const mismatches = fields.filter(field => dynamo[field] !== dsql[field]);
+  if (mismatches.length > 0) {
+    throw new Error(`Profile result mismatch for ${soulId}: ${mismatches.join(', ')}`);
+  }
+}
+
+function assertAnalyticsShape(dynamoRows, dsqlRows) {
+  const dynamo = new Map(dynamoRows.map(row => [row.location, row]));
+  const dsql = new Map(dsqlRows.map(row => [row.location, row]));
+  const locations = new Set([...dynamo.keys(), ...dsql.keys()]);
+
+  for (const location of locations) {
+    const dyn = dynamo.get(location);
+    const sql = dsql.get(location);
+    if (!dyn || !sql) {
+      throw new Error(`Analytics location mismatch: ${location}`);
+    }
+    for (const field of ['soulCount', 'redeemed', 'totalPower']) {
+      if (dyn[field] !== sql[field]) {
+        throw new Error(`Analytics mismatch for ${location}.${field}: DynamoDB=${dyn[field]}, DSQL=${sql[field]}`);
+      }
+    }
+  }
+}
+
+function assertSameIds(left, right, label) {
+  if (left.join('|') !== right.join('|')) {
+    throw new Error(`${label} ID mismatch: ${left.join(',')} vs ${right.join(',')}`);
+  }
+}
+
+function parseCliArgs(argv) {
+  const options = {};
+  if (argv[0] && !argv[0].startsWith('--')) {
+    options.iterations = argv[0];
   }
 
-  async getMultipleSoulIds(count) {
-    const result = await dynamodb.send(new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: 'StatusIndex',
-      KeyConditionExpression: '#status = :status',
-      ExpressionAttributeNames: { '#status': 'status' },
-      ExpressionAttributeValues: { ':status': { S: 'Bound' } },
-      Limit: count
-    }));
-    
-    return result.Items.map(item => item.soulId.S);
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (!arg.startsWith('--')) continue;
+    const key = arg.slice(2).replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+    const next = argv[i + 1];
+    if (next && !next.startsWith('--')) {
+      options[key] = next;
+      i += 1;
+    } else {
+      options[key] = true;
+    }
   }
+  return options;
+}
+
+function coercePositiveInt(value) {
+  const parsed = typeof value === 'number' ? value : parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Run the benchmark
 async function main() {
-  const benchmark = new BenchmarkSuite();
+  const benchmark = new BenchmarkSuite(parseCliArgs(process.argv.slice(2)));
   await benchmark.runBenchmark();
 }
 
-main().catch(console.error);
+main().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
