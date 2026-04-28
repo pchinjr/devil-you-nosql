@@ -532,17 +532,30 @@ class BenchmarkSuite {
 
   async fetchDsqlComplexAnalytics() {
     return this.dsqlClient.query(`
-      WITH soul_totals AS (
+      WITH ledger_totals AS (
+        SELECT
+          soul_contract_id,
+          SUM(amount) AS total_power
+        FROM soul_ledger
+        GROUP BY soul_contract_id
+      ),
+      event_totals AS (
+        SELECT
+          soul_contract_id,
+          COUNT(*) AS event_count
+        FROM soul_contract_events
+        GROUP BY soul_contract_id
+      ),
+      soul_totals AS (
         SELECT
           sc.id,
           sc.contract_location,
           sc.contract_status,
-          COALESCE(SUM(sl.amount), 0) AS total_power,
-          COUNT(sce.id) AS event_count
+          COALESCE(lt.total_power, 0) AS total_power,
+          COALESCE(et.event_count, 0) AS event_count
         FROM soul_contracts sc
-        LEFT JOIN soul_ledger sl ON sc.id = sl.soul_contract_id
-        LEFT JOIN soul_contract_events sce ON sc.id = sce.soul_contract_id
-        GROUP BY sc.id, sc.contract_location, sc.contract_status
+        LEFT JOIN ledger_totals lt ON sc.id = lt.soul_contract_id
+        LEFT JOIN event_totals et ON sc.id = et.soul_contract_id
       ),
       location_rollup AS (
         SELECT
